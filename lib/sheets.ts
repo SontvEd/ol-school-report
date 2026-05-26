@@ -9,23 +9,28 @@ const auth = new google.auth.GoogleAuth({
 });
 
 export async function getSheetData(sheetName = 'Trường') {
-  const sheets = google.sheets({ version: 'v4', auth });
-  
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
-    range: `${sheetName}!A:Z`, // Điều chỉnh theo sheet của bạn
-  });
+  try {
+    const sheets = google.sheets({ version: 'v4', auth });
 
-  const rows = response.data.values || [];
-  
-  // Chuyển thành array object
-  const headers = rows[1];
-  const data = rows.slice(2).map(row => {
-    return headers.reduce((obj: any, header: string, index: number) => {
-      obj[header] = row[index] || '';
-      return obj;
-    }, {});
-  });
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEETS_SPREADSHEET_ID,
+      range: `${sheetName}!A:Z`,
+    });
 
-  return data;
+    const rows = response.data.values || [];
+
+    // Chuyển thành array object
+    const headers = rows[1];
+    const data = rows.slice(2).map(row => {
+      return headers.reduce((obj: any, header: string, index: number) => {
+        obj[header] = row[index] || '';
+        return obj;
+      }, {});
+    });
+
+    return data;
+  } catch (err) {
+    console.error("Lỗi lấy dữ liệu từ Google Sheets:", err);
+    throw new Error("Không thể lấy dữ liệu từ Google Sheets");
+  }
 }

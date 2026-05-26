@@ -1,57 +1,147 @@
 import { getSheetData } from "@/lib/sheets";
 import { Suspense } from "react";
 import RefreshButton from "./components/RefreshButton";
+import {
+  Group,
+  Image,
+  Paper,
+  Stack,
+  Title,
+  Text,
+  SimpleGrid,
+  Badge,
+  Skeleton,
+  Box,
+  Divider,
+} from "@mantine/core";
+import { IconClockCheck, IconMapPin, IconSchool } from "@tabler/icons-react";
 
-export const revalidate = 0; // Tắt cache trên Vercel
+export const revalidate = 0;
 
 async function ReportContent() {
-  const data = await getSheetData('Trường');
+  const data = await getSheetData("Trường");
 
   const now = new Date();
-  const vietnamTime = now.toLocaleString('vi-VN', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
+  const vietnamTime = now.toLocaleString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-4xl font-bold">Báo Cáo OL School</h1>
-            <p className="text-gray-600 mt-2">
-              Cập nhật tự động • Lần cuối: {vietnamTime}
-            </p>
-          </div>
-          <RefreshButton />
-        </div>
+    <Stack gap="lg" px="md" maw={1200} mx="auto">
+      {/* Header */}
+      <Paper withBorder p="md" radius="md" shadow="xs" mt={10}>
+        <Group justify="space-between" wrap="nowrap">
+          <Group gap="sm">
+            <Image
+              src="/Logo_at-02.png"
+              alt="Logo"
+              h={48}
+              w="auto"
+              fit="contain"
+              fallbackSrc="https://placehold.co/120x48?text=Logo"
+            />
+            <Divider orientation="vertical" />
+            <Stack gap={2}>
+              <Title order={2} fw={700}>
+                Báo Cáo retention app Ôn luyện
+              </Title>
+              <Text size="sm" c="blue.6" fw={500}>
+                Giai đoạn 2023 – 2026
+              </Text>
+              <Group gap={6}>
+                <IconClockCheck size={14} color="gray" />
+                <Text size="xs" c="dimmed">
+                  Cập nhật dữ liệu lần cuối: {vietnamTime}
+                </Text>
+              </Group>
+            </Stack>
+            {/* <Stack gap={2}>
+              <Title order={2} fw={700}>
+                Báo Cáo OL School
+              </Title>
+              <Group gap={6}>
+                <IconClockCheck size={14} color="gray" />
+                <Text size="xs" c="dimmed">
+                  Cập nhật dữ liệu lần cuối: {vietnamTime}
+                </Text>
+              </Group>
+            </Stack> */}
+          </Group>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {data.map((item, index) => (
-            <div key={index} className="bg-white p-6 rounded-2xl shadow-sm">
-              <h3 className="font-semibold text-xl text-black">
-                {item['Tên trường'] || item.Name || 'Không có tên'}
-              </h3>
-              <p className="text-3xl font-bold text-green-600 mt-2">
-                {item['Tỉnh cũ'] || item.Revenue || '0'}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+          <RefreshButton />
+        </Group>
+      </Paper>
+
+      {/* Stats summary */}
+      <Group gap="xs">
+        <Badge
+          leftSection={<IconSchool size={12} />}
+          variant="light"
+          color="blue"
+          size="lg"
+        >
+          {data.length} trường
+        </Badge>
+      </Group>
+
+      {/* Grid cards */}
+      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+        {data.map((item, index) => (
+          <Paper
+            key={index}
+            withBorder
+            p="lg"
+            radius="md"
+            shadow="xs"
+            style={{ transition: "box-shadow 0.2s" }}
+          >
+            <Stack gap="xs">
+              <Group gap={8} wrap="nowrap">
+                <IconSchool size={20} color="var(--mantine-color-blue-6)" />
+                <Text fw={600} size="md" lineClamp={2}>
+                  {item["Tên trường"] || item.Name || "Không có tên"}
+                </Text>
+              </Group>
+
+              <Divider />
+
+              <Group gap={6}>
+                <IconMapPin size={16} color="var(--mantine-color-green-6)" />
+                <Text size="xl" fw={700} c="green.7">
+                  {item["Tỉnh cũ"] || item.Revenue || "0"}
+                </Text>
+              </Group>
+            </Stack>
+          </Paper>
+        ))}
+      </SimpleGrid>
+    </Stack>
   );
 }
 
 export default function Home() {
   return (
-    <Suspense fallback={<div className="text-center py-20">Đang tải dữ liệu...</div>}>
+    <Suspense
+      fallback={
+        <Box mih="100vh" bg="gray.0" py="xl">
+          <Stack gap="lg" px="md" maw={1200} mx="auto">
+            <Skeleton height={80} radius="md" />
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} height={120} radius="md" />
+              ))}
+            </SimpleGrid>
+          </Stack>
+        </Box>
+      }
+    >
       <ReportContent />
     </Suspense>
   );

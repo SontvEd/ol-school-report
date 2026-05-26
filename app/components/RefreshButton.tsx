@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Button, Tooltip } from '@mantine/core';
+import { IconReload } from '@tabler/icons-react';
+import { useMediaQuery } from '@mantine/hooks';
 
 export default function RefreshButton() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const handleRefresh = async () => {
     setLoading(true);
@@ -18,13 +22,18 @@ export default function RefreshButton() {
   };
 
   return (
-    <button
-      onClick={handleRefresh}
-      disabled={loading}
-      className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition"
-    >
-      <span className={loading ? 'animate-spin inline-block' : ''}>↻</span>
-      {loading ? 'Đang tải...' : 'Làm mới ngay'}
-    </button>
+    <Tooltip label={loading ? 'Đang tải...' : 'Cập nhật dữ liệu'} withArrow>
+      <Button
+        onClick={handleRefresh}
+        loading={loading}
+        variant="light"
+        color="blue"
+        size="sm"
+        px={isMobile ? 'xs' : undefined}
+      >
+        {!loading && <IconReload size={16} />}
+        {!isMobile && (loading ? ' Đang tải...' : ' Cập nhật dữ liệu')}
+      </Button>
+    </Tooltip>
   );
 }

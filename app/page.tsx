@@ -7,6 +7,18 @@ export const revalidate = 0; // Tắt cache trên Vercel
 async function ReportContent() {
   const data = await getSheetData('Trường');
 
+  const now = new Date();
+  const vietnamTime = now.toLocaleString('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-6">
@@ -14,7 +26,7 @@ async function ReportContent() {
           <div>
             <h1 className="text-4xl font-bold">Báo Cáo OL School</h1>
             <p className="text-gray-600 mt-2">
-              Cập nhật tự động • Lần cuối: {new Date().toLocaleString('vi-VN')}
+              Cập nhật tự động • Lần cuối: {vietnamTime}
             </p>
           </div>
           <RefreshButton />

@@ -1,10 +1,12 @@
 import { getSheetData } from "@/lib/sheets";
 import { Suspense } from "react";
-import RefreshButton from "./RefreshButton";
+import RefreshButton from "./components/RefreshButton";
+
+export const revalidate = 0; // Tắt cache trên Vercel
 
 async function ReportContent() {
-  const data = await getSheetData('Trường');   // Đặt tên sheet đúng của bạn
-  
+  const data = await getSheetData('Trường');
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-7xl mx-auto px-6">
@@ -15,12 +17,9 @@ async function ReportContent() {
               Cập nhật tự động • Lần cuối: {new Date().toLocaleString('vi-VN')}
             </p>
           </div>
-          
-          {/* Dùng Client Component */}
           <RefreshButton />
         </div>
 
-        {/* Hiển thị dữ liệu */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {data.map((item, index) => (
             <div key={index} className="bg-white p-6 rounded-2xl shadow-sm">

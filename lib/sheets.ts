@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { unstable_noStore as noStore } from 'next/cache';
 
 const auth = new google.auth.GoogleAuth({
   credentials: {
@@ -9,6 +10,8 @@ const auth = new google.auth.GoogleAuth({
 });
 
 export async function getSheetData(sheetName = 'Trường') {
+  noStore(); // Luôn fetch mới, không dùng cache
+
   try {
     const sheets = google.sheets({ version: 'v4', auth });
 
@@ -18,19 +21,19 @@ export async function getSheetData(sheetName = 'Trường') {
     });
 
     const rows = response.data.values || [];
+    if (rows.length < 2) return [];
 
-    // Chuyển thành array object
     const headers = rows[1];
-    const data = rows.slice(2).map(row => {
-      return headers.reduce((obj: any, header: string, index: number) => {
-        obj[header] = row[index] || '';
+    const data = rows.slice(2).map(row =>
+      headers.reduce((obj: Record<string, string>, header: string, index: number) => {
+        obj[header] = row[index] ?? '';
         return obj;
-      }, {});
-    });
+      }, {})
+    );
 
     return data;
   } catch (err) {
-    console.error("Lỗi lấy dữ liệu từ Google Sheets:", err);
-    throw new Error("Không thể lấy dữ liệu từ Google Sheets");
+    console.error('Lỗi lấy dữ liệu từ Google Sheets:', err);
+    throw new Error('Không thể lấy dữ liệu từ Google Sheets');
   }
 }

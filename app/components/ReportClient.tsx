@@ -1,4 +1,4 @@
-"use client";   // ← Quan trọng nhất
+"use client";
 
 import { useState } from "react";
 import {
@@ -15,6 +15,7 @@ import {
     IconBuildings, IconCalendar, IconClockCheck, IconHomeHand,
     IconMapPin, IconMinus, IconSchool, IconUsers
 } from "@tabler/icons-react";
+import { useMediaQuery } from '@mantine/hooks';
 
 import RefreshButton from "./RefreshButton";
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -39,25 +40,26 @@ const retentionByPeriod = [
     { period: "2025-2026", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
 ];
 
+
 const retentionByArea = [
-    { label: "KV1", value: 88, color: "blue" },
-    { label: "KV2", value: 72, color: "green" },
-    { label: "KV3", value: 65, color: "orange" },
-    { label: "KV4", value: 80, color: "grape" },
+    { area: "KV1", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
+    { area: "KV2", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
+    { area: "KV3", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
+    { area: "KV4", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
 ];
 
 const retentionByBusiness = [
-    { label: "KD1", value: 91, color: "blue" },
-    { label: "KD2", value: 78, color: "green" },
-    { label: "KD3", value: 83, color: "orange" },
-    { label: "KD4", value: 69, color: "grape" },
+    { business: "KD1", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
+    { business: "KD2", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
+    { business: "KD3", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
+    { business: "KD4", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
 ];
 
 const retentionBySchoolLevel = [
-    { label: "Tiểu học", value: 74, color: "red" },
-    { label: "THCS", value: 82, color: "blue" },
-    { label: "THPT", value: 88, color: "green" },
-    { label: "Liên cấp", value: 91, color: "grape" },
+    { schoolLevel: "Tiểu học", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
+    { schoolLevel: "THCS", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
+    { schoolLevel: "THPT", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
+    { schoolLevel: "Liên cấp", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
 ];
 
 
@@ -237,6 +239,7 @@ function SectionTitle({
 // ─── Main Client Component ───────────────────────────────────────
 export default function ReportClient({ initialData }: { initialData: any }) {
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>("Trường");
+    const isMobile = useMediaQuery('(max-width: 768px)');
 
     const now = new Date();
     const vietnamTime = now.toLocaleString("vi-VN", {
@@ -252,18 +255,18 @@ export default function ReportClient({ initialData }: { initialData: any }) {
             <Paper withBorder p="md" radius="md" shadow="xs" mt={10}>
                 <Group justify="space-between" wrap="nowrap">
                     <Group gap="sm">
-                        <Image
+                        {!isMobile && (<Image
                             src="/Logo_at-02.png"
                             alt="Logo"
                             h={48}
                             w="auto"
                             fit="contain"
                             fallbackSrc="https://placehold.co/120x48?text=Logo"
-                        />
+                        />)}
                         <Divider orientation="vertical" />
                         <Stack gap={2}>
                             <Title order={2} fw={700}>
-                                Báo Cáo retention app Ôn luyện
+                                Tái đăng ký app Ôn luyện
                             </Title>
                             <Text size="sm" c="blue.6" fw={500}>
                                 Giai đoạn 2023 – 2026
@@ -281,7 +284,7 @@ export default function ReportClient({ initialData }: { initialData: any }) {
             </Paper>
 
             {/* Bộ lọc giai đoạn */}
-            <Paper withBorder p="md" radius="md" shadow="xs">
+            <Paper withBorder p="md" radius="md" shadow="xs" style={{ position: "sticky", top: 16, zIndex: 9999, backgroundColor: "var(--mantine-color-body)",}}>
                 <Group gap="md" wrap="wrap" justify="space-between">
                     <Group gap={10}>
                         <Group gap={6}>
@@ -381,22 +384,92 @@ export default function ReportClient({ initialData }: { initialData: any }) {
                                 withLegend
                                 legendProps={{
                                     verticalAlign: 'bottom',
-                                    height: 60,
-                                    layout: 'horizontal',
-                                    align: 'center',
-                                    iconSize: 10,
-                                    iconType: 'rect',
                                     wrapperStyle: {
                                         paddingTop: '10px',
                                         fontSize: '13px',
                                     },
                                 }}
                                 series={[
-                                    { name: "moi", color: "green.6" },
-                                    { name: "giaHan", color: "blue.6" },
-                                    { name: "totNghiep", color: "violet.6" },
-                                    { name: "chuaTrienKhai", color: "yellow.6" },
-                                    { name: "huy", color: "red.6" },
+                                    { name: "moi", label: "Mới", color: "green.6" },
+                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
+                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
+                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
+                                    { name: "huy", label:"Hủy", color: "red.6" },
+                                ]}
+                            />
+                        </Paper>
+
+                        {/* 2. Biểu đồ cột - Retention theo khu vực */}
+                        <Paper withBorder p="md" radius="md" shadow="xs">
+                            <Title order={4} mb="md">Retention theo khu vực</Title>
+                            <BarChart
+                                h={300}
+                                data={retentionByArea}
+                                dataKey="area"
+                                withLegend
+                                legendProps={{
+                                    verticalAlign: 'bottom',
+                                    wrapperStyle: {
+                                        paddingTop: '10px',
+                                        fontSize: '13px',
+                                    },
+                                }}
+                                series={[
+                                    { name: "moi", label: "Mới", color: "green.6" },
+                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
+                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
+                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
+                                    { name: "huy", label:"Hủy", color: "red.6" },
+                                ]}
+                            />
+                        </Paper>
+
+                        {/* 3. Biểu đồ cột - Retention theo kinh doanh */}
+                        <Paper withBorder p="md" radius="md" shadow="xs">
+                            <Title order={4} mb="md">Retention theo kinh doanh</Title>
+                            <BarChart
+                                h={300}
+                                data={retentionByBusiness}
+                                dataKey="business"
+                                withLegend
+                                legendProps={{
+                                    verticalAlign: 'bottom',
+                                    wrapperStyle: {
+                                        paddingTop: '10px',
+                                        fontSize: '13px',
+                                    },
+                                }}
+                                series={[
+                                    { name: "moi", label: "Mới", color: "green.6" },
+                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
+                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
+                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
+                                    { name: "huy", label:"Hủy", color: "red.6" },
+                                ]}
+                            />
+                        </Paper>
+
+                        {/* 4. Biểu đồ cột - Retention theo cấp học */}
+                        <Paper withBorder p="md" radius="md" shadow="xs">
+                            <Title order={4} mb="md">Retention theo cấp học</Title>
+                            <BarChart
+                                h={300}
+                                data={retentionBySchoolLevel}
+                                dataKey="schoolLevel"
+                                withLegend
+                                legendProps={{
+                                    verticalAlign: 'bottom',
+                                    wrapperStyle: {
+                                        paddingTop: '10px',
+                                        fontSize: '13px',
+                                    },
+                                }}
+                                series={[
+                                    { name: "moi", label: "Mới", color: "green.6" },
+                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
+                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
+                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
+                                    { name: "huy", label:"Hủy", color: "red.6" },
                                 ]}
                             />
                         </Paper>

@@ -1,8 +1,8 @@
 // app/page.tsx
 import { getSheetData } from "@/lib/sheets";
 import { Suspense } from "react";
-import ReportClient from "./components/ReportClient";   // ← Tách ra
 import { Box, SimpleGrid, Skeleton, Stack } from "@mantine/core";
+import ReportClient from "./components/ReportClient";
 
 export const revalidate = 0;
 

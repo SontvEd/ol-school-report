@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@mantine/charts": "^9.2.1",
     "@mantine/core": "^9.2.1",
     "@tabler/icons": "^3.44.0",
     "@tabler/icons-react": "^3.44.0",

@@ -1,25 +1,70 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
-    Group, Image, Paper, Stack, Title, Text, SimpleGrid, Badge,
-    Skeleton, Box, Divider, Progress, Pill, Select, SegmentedControl,
-    Grid,
+    Group,
+    Image,
+    Paper,
+    Stack,
+    Title,
+    Text,
+    SimpleGrid,
+    Badge,
+    Pill,
+    Select,
+    SegmentedControl,
+    Table,
     ThemeIcon,
     TextInput,
+    Divider,
 } from "@mantine/core";
 import { BarChart } from '@mantine/charts';
 import '@mantine/charts/styles.css';
 import {
-    IconArrowDown, IconArrowUp, IconBookmark, IconBriefcase,
-    IconBuildingCommunity, IconBuildingMinus, IconBuildingPlus,
-    IconBuildings, IconCalendar, IconClockCheck, IconHomeHand,
-    IconMapPin, IconMinus, IconSchool, IconSearch, IconUsers
+    IconArrowDown,
+    IconArrowUp,
+    IconBookmark,
+    IconBriefcase,
+    IconBuildingCommunity,
+    IconBuildingMinus,
+    IconBuildingPlus,
+    IconBuildings,
+    IconCalendar,
+    IconClockCheck,
+    IconHomeHand,
+    IconMapPin,
+    IconSchool,
+    IconSearch,
 } from "@tabler/icons-react";
 import { useMediaQuery } from '@mantine/hooks';
 
 import RefreshButton from "./RefreshButton";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+export type RetentionStatus = "new" | "renew" | "graduated" | "not_started" | "cancelled";
+
+export interface Period {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    isActive?: boolean;
+}
+
+export interface SchoolPeriodData {
+    students: number;
+    status: RetentionStatus;
+}
+
+export interface School {
+    id: string;
+    schoolName: string;
+    area: string;
+    province: string;
+    schoolLevel: string;
+    businessName: string;
+    periods: Record<string, SchoolPeriodData>;
+}
 
 interface StatItem {
     label: string;
@@ -31,16 +76,117 @@ interface StatItem {
     accentColor: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Mock Data ─────────────────────────────────────────────────────────────
+export const PERIODS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
 
-const PERIODS = ["2023-2026", "2025-2026", "2024-2025", "2023-2024"];
+export const STATUS_LABELS: Record<RetentionStatus, string> = {
+    new: "Mới",
+    renew: "Gia hạn",
+    graduated: "Tốt nghiệp",
+    not_started: "Chưa triển khai",
+    cancelled: "Hủy",
+};
 
-const retentionByPeriod = [
+export const STATUS_COLORS: Record<RetentionStatus, string> = {
+    new: "green",
+    renew: "blue",
+    graduated: "violet",
+    not_started: "yellow",
+    cancelled: "red",
+};
+
+export const SCHOOLS: School[] = [
+    {
+        id: "S-00001",
+        schoolName: "THPT Chuyên Hà Nội",
+        area: "KV1",
+        province: "Hà Nội",
+        schoolLevel: "THPT",
+        businessName: "KD1",
+        periods: {
+            "2023-2024": { students: 1200, status: "renew" },
+            "2024-2025": { students: 1350, status: "renew" },
+            "2025-2026": { students: 1500, status: "renew" },
+            "2026-2027": { students: 1600, status: "renew" },
+        },
+    },
+    {
+        id: "S-00002",
+        schoolName: "THCS Đống Đa",
+        area: "KV1",
+        province: "Hà Nội",
+        schoolLevel: "THCS",
+        businessName: "KD1",
+        periods: {
+            "2023-2024": { students: 700, status: "new" },
+            "2024-2025": { students: 850, status: "renew" },
+            "2025-2026": { students: 920, status: "renew" },
+            "2026-2027": { students: 950, status: "renew" },
+        },
+    },
+    {
+        id: "S-00003",
+        schoolName: "Tiểu học Việt Úc",
+        area: "KV2",
+        province: "Đà Nẵng",
+        schoolLevel: "Tiểu học",
+        businessName: "KD2",
+        periods: {
+            "2023-2024": { students: 0, status: "not_started" },
+            "2024-2025": { students: 650, status: "new" },
+            "2025-2026": { students: 0, status: "not_started" },
+            "2026-2027": { students: 720, status: "renew" },
+        },
+    },
+    {
+        id: "S-00004",
+        schoolName: "Liên cấp Nguyễn Huệ",
+        area: "KV3",
+        province: "TP.HCM",
+        schoolLevel: "Liên cấp",
+        businessName: "KD3",
+        periods: {
+            "2023-2024": { students: 2000, status: "renew" },
+            "2024-2025": { students: 2200, status: "renew" },
+            "2025-2026": { students: 1800, status: "graduated" },
+            "2026-2027": { students: 0, status: "cancelled" },
+        },
+    },
+    {
+        id: "S-00005",
+        schoolName: "THPT Lê Quý Đôn",
+        area: "KV4",
+        province: "Cần Thơ",
+        schoolLevel: "THPT",
+        businessName: "KD4",
+        periods: {
+            "2023-2024": { students: 0, status: "cancelled" },
+            "2024-2025": { students: 900, status: "new" },
+            "2025-2026": { students: 1050, status: "renew" },
+            "2026-2027": { students: 1120, status: "renew" },
+        },
+    },
+    {
+        id: "S-00006",
+        schoolName: "THCS Trần Phú",
+        area: "KV2",
+        province: "Huế",
+        schoolLevel: "THCS",
+        businessName: "KD2",
+        periods: {
+            "2023-2024": { students: 500, status: "new" },
+            "2024-2025": { students: 650, status: "renew" },
+            "2025-2026": { students: 780, status: "renew" },
+            "2026-2027": { students: 820, status: "renew" },
+        },
+    },
+];
+
+export const retentionByPeriod = [
     { period: "2023-2024", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
     { period: "2024-2025", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
     { period: "2025-2026", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
 ];
-
 
 const retentionByArea = [
     { area: "KV1", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
@@ -62,7 +208,6 @@ const retentionBySchoolLevel = [
     { schoolLevel: "THPT", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
     { schoolLevel: "Liên cấp", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
 ];
-
 
 const STATS: StatItem[] = [
     {
@@ -117,86 +262,50 @@ const QUICK_FILTERS = [
     { label: "Học sinh", count: 120, color: "green", icon: IconSchool },
 ];
 
-// ─── Sub-components ─────────────────────
+// ─── Sub Components ────────────────────────────────────────────────────────
 function StatCard({ stat }: { stat: StatItem }) {
     const Icon = stat.icon;
-    const ac = stat.accentColor; // shorthand
-
-    // Trend arrow + color
-    const trendColor =
-        stat.trendType === "up"
-            ? "green.7"
-            : stat.trendType === "down"
-                ? "red.7"
-                : "dimmed";
-
-    const TrendIcon =
-        stat.trendType === "up"
-            ? IconArrowUp
-            : stat.trendType === "down"
-                ? IconArrowDown
-                : null;
+    const TrendIcon = stat.trendType === "up" ? IconArrowUp : stat.trendType === "down" ? IconArrowDown : null;
 
     return (
         <Paper
             withBorder
             p="sm"
             radius="md"
-            style={{
-                borderTopWidth: 3,
-                borderTopColor: `var(--mantine-color-${ac}-5)`,
-            }}
+            style={{ borderTop: `3px solid var(--mantine-color-${stat.accentColor}-5)` }}
         >
             <Stack gap={4}>
-                {/* Icon + Label */}
-                <Group gap={4} align="center" wrap="nowrap">
-                    <Icon size={14} color={`var(--mantine-color-${ac}-6)`} />
-                    <Text size="sm" lh={1.3} truncate c={`var(--mantine-color-${ac}-6)`}>
+                <Group gap={6} align="center">
+                    <Icon size={16} color={`var(--mantine-color-${stat.accentColor}-6)`} />
+                    <Text size="sm" fw={500} c={`${stat.accentColor}.6`}>
                         {stat.label}
                     </Text>
                 </Group>
 
-                {/* Value — dùng màu accent */}
-                <Text
-                    size="xl"
-                    fw={600}
-                    lh={1.1}
-                    c={`${ac}.7`}
-                >
-                    {stat.value}
+                <Text size="xl" fw={700} c={`${stat.accentColor}.7`}>
+                    {stat.value.toLocaleString()}
                 </Text>
 
-                {/* Sub row: % trái — trend phải */}
-                <Group justify="space-between" gap={4} wrap="nowrap">
-                    {/* Trái: tỷ lệ % hoặc để trống */}
-                    <Pill
-                        size="xs"
-                        c={stat.percent ? `${ac}.9` : undefined}
-                        bg={stat.percent ? `${ac}.1` : "#fff"}
-                    >
-                        {stat.percent ?? ""}
-                    </Pill>
+                <Group justify="space-between" align="center">
+                    {stat.percent ? (
+                        <Pill size="xs" c={`${stat.accentColor}.9`} bg={`${stat.accentColor}.1`}>
+                            {stat.percent}
+                        </Pill>
+                    ) : (
+                        <div />
+                    )}
 
-                    {/* Phải: biến động vs kỳ trước */}
-                    {stat.trend ? (
-                        <Group gap={2} wrap="nowrap" style={{ flexShrink: 0 }}>
-                            {TrendIcon && (
-                                <TrendIcon
-                                    size={10}
-                                    color={
-                                        stat.trendType === "up"
-                                            ? "var(--mantine-color-green-9)"
-                                            : "var(--mantine-color-red-9)"
-                                    }
-                                />
-                            )}
-                            <Text size="xs" c={trendColor}>
+                    {stat.trend && TrendIcon && (
+                        <Group gap={3} align="center">
+                            <TrendIcon
+                                size={12}
+                                color={stat.trendType === "up" ? "var(--mantine-color-green-7)" : "var(--mantine-color-red-7)"}
+                            />
+                            <Text size="xs" c={stat.trendType === "up" ? "green.7" : "red.7"}>
                                 {stat.trend}
                             </Text>
-                            <Text size="xs" c="gray"> vs kỳ trước</Text>
+                            <Text size="xs" c="dimmed">vs kỳ trước</Text>
                         </Group>
-                    ) : (
-                        <span />
                     )}
                 </Group>
             </Stack>
@@ -204,79 +313,108 @@ function StatCard({ stat }: { stat: StatItem }) {
     );
 }
 
-function RetentionGrid({ items }: { items: { label: string; value: number; color: string }[] }) {
-    return (
-        <SimpleGrid cols={2} spacing="sm">
-            {items.map((item) => (
-                <Paper key={item.label} withBorder p="sm" radius="md" ta="center">
-                    <Text size="xs" fw={600} c="dimmed" mb={4}>{item.label}</Text>
-                    <Title order={3} fw={700} c={`${item.color}.7`}>{item.value}%</Title>
-                    <Progress value={item.value} color={item.color} size="sm" radius="xl" mt={6} />
-                </Paper>
-            ))}
-        </SimpleGrid>
-    );
-}
-
-function SectionTitle({
-    icon,
-    title,
-}: {
-    icon: React.ReactNode;
-    title: string;
+function RetentionBarChart({ title, data, dataKey }: { 
+    title: string; 
+    data: any[]; 
+    dataKey: string;
 }) {
     return (
-        <Group gap={8} mb="sm">
-            <ThemeIcon size="sm" variant="light" color="blue" radius="sm">
-                {icon}
-            </ThemeIcon>
-            <Text fw={600} size="sm">
-                {title}
-            </Text>
-        </Group>
+        <Paper withBorder p="md" radius="md" shadow="xs">
+            <Title order={4} mb="md">{title}</Title>
+            <BarChart
+                h={300}
+                data={data}
+                dataKey={dataKey}
+                withLegend
+                legendProps={{
+                    verticalAlign: 'bottom',
+                    wrapperStyle: { paddingTop: 12, fontSize: 13 },
+                }}
+                series={[
+                    { name: "moi", label: "Mới", color: "green.6" },
+                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
+                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
+                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
+                    { name: "huy", label: "Hủy", color: "red.6" },
+                ]}
+            />
+        </Paper>
     );
 }
 
-// ─── Main Client Component ───────────────────────────────────────
-export default function ReportClient({ initialData }: { initialData: any }) {
+// ─── Main Component ────────────────────────────────────────────────────────
+export default function ReportClient({ initialData }: { initialData?: any }) {
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>("Trường");
     const [isScrolled, setIsScrolled] = useState(false);
-    const [search, setSearch] = useState("")
-    const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState<RetentionStatus | null>(null);
+    const [vietnamTime, setVietnamTime] = useState("");
 
     const isMobile = useMediaQuery('(max-width: 768px)');
 
-    const now = new Date();
-    const vietnamTime = now.toLocaleString("vi-VN", {
-        timeZone: "Asia/Ho_Chi_Minh",
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", second: "2-digit",
-        hour12: false,
-    });
-
+    // Real-time Vietnam time
     useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 80); // thay đổi màu khi cuộn quá 80px
+        const updateTime = () => {
+            const now = new Date();
+            setVietnamTime(
+                now.toLocaleString("vi-VN", {
+                    timeZone: "Asia/Ho_Chi_Minh",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                })
+            );
         };
 
+        updateTime();
+        const interval = setInterval(updateTime, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Scroll effect for sticky header
+    useEffect(() => {
+        const handleScroll = () => setIsScrolled(window.scrollY > 80);
         window.addEventListener("scroll", handleScroll);
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
+    // Filter logic
+    const filteredSchools = useMemo(() => {
+        const keyword = search.toLowerCase().trim();
+
+        return SCHOOLS.filter((school) => {
+            const matchSearch =
+                school.schoolName.toLowerCase().includes(keyword) ||
+                school.id.toLowerCase().includes(keyword);
+
+            const matchStatus =
+                !statusFilter ||
+                Object.values(school.periods).some((p) => p.status === statusFilter);
+
+            return matchSearch && matchStatus;
+        });
+    }, [search, statusFilter]);
+
     return (
-        <Stack gap="lg" px="md" maw={1200} mx="auto">
+        <Stack gap="lg" px="md" maw={1400} mx="auto">
             {/* Header */}
-            <Paper withBorder p="md" radius="md" shadow="xs" mt={10}>
+            <Paper withBorder p="md" radius="md" shadow="xs">
                 <Group justify="space-between" wrap="nowrap">
                     <Group gap="sm">
-                        {!isMobile && (<Image
-                            src="/Logo_at-02.png"
-                            alt="Logo"
-                            h={48}
-                            w="auto"
-                            fit="contain"
-                            fallbackSrc="https://placehold.co/120x48?text=Logo"
-                        />)}
+                        {!isMobile && (
+                            <Image
+                                src="/Logo_at-02.png"
+                                alt="Logo"
+                                h={48}
+                                w="auto"
+                                fit="contain"
+                                fallbackSrc="https://placehold.co/160x48?text=Logo"
+                            />
+                        )}
                         <Divider orientation="vertical" />
                         <Stack gap={2}>
                             <Title order={2} fw={700}>
@@ -286,9 +424,9 @@ export default function ReportClient({ initialData }: { initialData: any }) {
                                 Giai đoạn 2023 – 2026
                             </Text>
                             <Group gap={6}>
-                                <IconClockCheck size={14} color="gray" />
+                                <IconClockCheck size={16} color="gray" />
                                 <Text size="xs" c="dimmed">
-                                    Cập nhật dữ liệu lần cuối: {vietnamTime}
+                                    Cập nhật lần cuối: {vietnamTime}
                                 </Text>
                             </Group>
                         </Stack>
@@ -297,257 +435,193 @@ export default function ReportClient({ initialData }: { initialData: any }) {
                 </Group>
             </Paper>
 
-            {/* Sticky Filter Header */}
-            <Box
+            {/* Sticky Filters */}
+            <Paper
+                withBorder
+                p="md"
+                radius="md"
+                shadow={isScrolled ? "sm" : "xs"}
                 style={{
                     position: "sticky",
                     top: 0,
                     zIndex: 100,
-                    backgroundColor: isScrolled ? "var(--mantine-color-gray-2)" : "white",
-                    borderBottom: isScrolled
-                        ? "1px solid var(--mantine-color-gray-2)"
-                        : "1px solid var(--mantine-color-gray-3)",
-                    transition: "background-color 0.2s ease, border-bottom 0.2s ease",
-                    marginTop: "10px",
-                    paddingBottom: "8px",
+                    backgroundColor: isScrolled ? "var(--mantine-color-gray-1)" : "white",
                 }}
             >
-                <Paper
-                    withBorder
-                    p="md"
-                    radius="md"
-                    shadow={isScrolled ? "sm" : "xs"}
-                    style={{
-                        backgroundColor: "transparent",
-                        border: "none",
-                    }}
-                >
-                    <Group gap="md" wrap="wrap" justify="space-between">
-                        <Group gap={10}>
-                            <Group gap={6}>
-                                <IconCalendar size={20} />
-                                <Text size="md" fw={500} tt="uppercase" style={{ letterSpacing: "0.05em" }}>
-                                    Giai đoạn
-                                </Text>
+                {/* Period + Filters */}
+                <Group justify="space-between" wrap="wrap" gap="md">
+                    <Group gap={8}>
+                        <Group gap={6}>
+                            <IconCalendar size={20} />
+                            <Text fw={500} tt="uppercase" size="md">
+                                Giai đoạn
+                            </Text>
+                        </Group>
+                        <SegmentedControl data={PERIODS} defaultValue={PERIODS[0]} size="sm" radius="md" />
+                    </Group>
+
+                    <Group gap="sm" wrap="nowrap">
+                        <Select placeholder="Khu vực" data={["Tất cả", "KV1", "KV2", "KV3", "KV4"]} defaultValue="Tất cả" leftSection={<IconMapPin size={16} />} />
+                        <Select placeholder="Kinh doanh" data={["Tất cả", "KD1", "KD2", "KD3", "KD4"]} defaultValue="Tất cả" leftSection={<IconBriefcase size={16} />} />
+                        <Select placeholder="Cấp học" data={["Tất cả", "Tiểu học", "THCS", "THPT", "Liên cấp"]} defaultValue="Tất cả" leftSection={<IconBookmark size={16} />} />
+                    </Group>
+                </Group>
+
+                {/* Quick Filters */}
+                <Group gap="sm" mt="md">
+                    {QUICK_FILTERS.map(({ label, count, color, icon: Icon }) => (
+                        <Pill
+                            key={label}
+                            size="sm"
+                            onClick={() => setActiveQuickFilter(activeQuickFilter === label ? null : label)}
+                            style={{
+                                cursor: "pointer",
+                                border: `1.5px solid var(--mantine-color-${color}-${activeQuickFilter === label ? '9' : '3'})`,
+                                background: activeQuickFilter === label
+                                    ? `var(--mantine-color-${color}-light)`
+                                    : `var(--mantine-color-${color}-0)`,
+                                color: `var(--mantine-color-${color}-${activeQuickFilter === label ? '9' : '6'})`,
+                            }}
+                        >
+                            <Group gap={6} wrap="nowrap">
+                                <Icon size={18} />
+                                <Text>{label} ({count})</Text>
                             </Group>
-                            <SegmentedControl
-                                data={PERIODS}
-                                defaultValue={PERIODS[0]}
-                                size="sm"
-                                radius="md"
-                            />
-                        </Group>
-
-                        <Group wrap="nowrap">
-                            <Select
-                                size="sm"
-                                placeholder="Khu vực"
-                                data={["Tất cả", "KV1", "KV2", "KV3", "KV4"]}
-                                defaultValue="Tất cả"
-                                leftSection={<IconMapPin size={16} />}
-                                maw={140}
-                            />
-                            <Select
-                                size="sm"
-                                placeholder="Kinh doanh"
-                                data={["Tất cả", "KD1", "KD2", "KD3", "KD4"]}
-                                defaultValue="Tất cả"
-                                leftSection={<IconBriefcase size={16} />}
-                                maw={140}
-                            />
-                            <Select
-                                size="sm"
-                                placeholder="Cấp học"
-                                data={["Tất cả", "Tiểu học", "THCS", "THPT", "Liên cấp"]}
-                                defaultValue="Tất cả"
-                                leftSection={<IconBookmark size={16} />}
-                                maw={140}
-                            />
-                        </Group>
-                    </Group>
-
-                    {/* Quick Filters */}
-                    <Group gap="sm" mt="sm">
-                        {QUICK_FILTERS.map(({ label, count, color, icon: Icon }) => (
-                            <Pill
-                                size="sm"
-                                key={label}
-                                onClick={() =>
-                                    setActiveQuickFilter(activeQuickFilter === label ? null : label)
-                                }
-                                style={{
-                                    cursor: "pointer",
-                                    outline: activeQuickFilter === label
-                                        ? `1.5px solid var(--mantine-color-${color}-9)`
-                                        : `1.5px solid var(--mantine-color-${color}-3)`,
-                                    background: activeQuickFilter === label
-                                        ? `var(--mantine-color-${color}-light)`
-                                        : `var(--mantine-color-${color}-0)`,
-                                    color: activeQuickFilter === label
-                                        ? `var(--mantine-color-${color}-9)`
-                                        : `var(--mantine-color-${color}-3)`,
-                                }}
-                            >
-                                <Group gap={4} align="center" wrap="nowrap">
-                                    <Icon size={20} />
-                                    <Text>{label} ({count})</Text>
-                                </Group>
-                            </Pill>
-                        ))}
-                    </Group>
-                </Paper>
-            </Box>
-
-            <Paper withBorder p="md" radius="md" shadow="xs">
-                <Stack gap="xs">
-                    <Text fw={700} size="md" tt="uppercase" c="dimmed">
-                        Tổng Quan
-                    </Text>
-
-                    {/* ── KPI ── */}
-                    <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
-                        {STATS.map((s) => (
-                            <StatCard key={s.label} stat={s} />
-                        ))}
-                    </SimpleGrid>
-
-                    {/* ── BIỂU ĐỒ RETENTION ── */}
-                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
-                        {/* 1. Biểu đồ cột - Retention theo giai đoạn */}
-                        <Paper withBorder p="md" radius="md" shadow="xs">
-                            <Title order={4} mb="md">Retention theo giai đoạn</Title>
-                            <BarChart
-                                h={300}
-                                data={retentionByPeriod}
-                                dataKey="period"
-                                withLegend
-                                legendProps={{
-                                    verticalAlign: 'bottom',
-                                    wrapperStyle: {
-                                        paddingTop: '10px',
-                                        fontSize: '13px',
-                                    },
-                                }}
-                                series={[
-                                    { name: "moi", label: "Mới", color: "green.6" },
-                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
-                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
-                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
-                                    { name: "huy", label: "Hủy", color: "red.6" },
-                                ]}
-                            />
-                        </Paper>
-
-                        {/* 2. Biểu đồ cột - Retention theo khu vực */}
-                        <Paper withBorder p="md" radius="md" shadow="xs">
-                            <Title order={4} mb="md">Retention theo khu vực</Title>
-                            <BarChart
-                                h={300}
-                                data={retentionByArea}
-                                dataKey="area"
-                                withLegend
-                                legendProps={{
-                                    verticalAlign: 'bottom',
-                                    wrapperStyle: {
-                                        paddingTop: '10px',
-                                        fontSize: '13px',
-                                    },
-                                }}
-                                series={[
-                                    { name: "moi", label: "Mới", color: "green.6" },
-                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
-                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
-                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
-                                    { name: "huy", label: "Hủy", color: "red.6" },
-                                ]}
-                            />
-                        </Paper>
-
-                        {/* 3. Biểu đồ cột - Retention theo kinh doanh */}
-                        <Paper withBorder p="md" radius="md" shadow="xs">
-                            <Title order={4} mb="md">Retention theo kinh doanh</Title>
-                            <BarChart
-                                h={300}
-                                data={retentionByBusiness}
-                                dataKey="business"
-                                withLegend
-                                legendProps={{
-                                    verticalAlign: 'bottom',
-                                    wrapperStyle: {
-                                        paddingTop: '10px',
-                                        fontSize: '13px',
-                                    },
-                                }}
-                                series={[
-                                    { name: "moi", label: "Mới", color: "green.6" },
-                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
-                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
-                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
-                                    { name: "huy", label: "Hủy", color: "red.6" },
-                                ]}
-                            />
-                        </Paper>
-
-                        {/* 4. Biểu đồ cột - Retention theo cấp học */}
-                        <Paper withBorder p="md" radius="md" shadow="xs">
-                            <Title order={4} mb="md">Retention theo cấp học</Title>
-                            <BarChart
-                                h={300}
-                                data={retentionBySchoolLevel}
-                                dataKey="schoolLevel"
-                                withLegend
-                                legendProps={{
-                                    verticalAlign: 'bottom',
-                                    wrapperStyle: {
-                                        paddingTop: '10px',
-                                        fontSize: '13px',
-                                    },
-                                }}
-                                series={[
-                                    { name: "moi", label: "Mới", color: "green.6" },
-                                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
-                                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
-                                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
-                                    { name: "huy", label: "Hủy", color: "red.6" },
-                                ]}
-                            />
-                        </Paper>
-                    </SimpleGrid>
-                </Stack>
-
+                        </Pill>
+                    ))}
+                </Group>
             </Paper>
 
+            {/* Overview Section */}
             <Paper withBorder p="md" radius="md" shadow="xs">
-                <Stack gap="xs">
-                    <Group justify="space-between">
-                        <Text fw={700} size="md" tt="uppercase" c="dimmed">
-                            Chi tiết trường (56)
-                        </Text>
-                        <Group gap={8}>
-                            <TextInput
-                                placeholder="Tìm trường..."
-                                leftSection={<IconSearch size={14} />}
-                                value={search}
-                                onChange={(e) => setSearch(e.currentTarget.value)}
-                                size="xs"
-                                w={180}
-                            />
-                            <Select
-                                placeholder="Trạng thái"
-                                data={[
-                                    { value: "tatCa", label: "Tất cả" },
-                                    { value: "", label: "Thành viên" },
-                                    { value: "trial", label: "Thử việc" },
-                                ]}
-                                value={statusFilter}
-                                onChange={setStatusFilter}
-                                clearable
-                                size="xs"
-                                w={130}
-                            />
-                        </Group>
+                <Text fw={700} size="md" tt="uppercase" c="dimmed" mb="md">
+                    TỔNG QUAN
+                </Text>
+
+                <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
+                    {STATS.map((stat) => (
+                        <StatCard key={stat.label} stat={stat} />
+                    ))}
+                </SimpleGrid>
+
+                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mt="xl">
+                    <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriod} dataKey="period" />
+                    <RetentionBarChart title="Retention theo khu vực" data={retentionByArea} dataKey="area" />
+                    <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusiness} dataKey="business" />
+                    <RetentionBarChart title="Retention theo cấp học" data={retentionBySchoolLevel} dataKey="schoolLevel" />
+                </SimpleGrid>
+            </Paper>
+
+            {/* School Detail Table */}
+            <Paper withBorder p="md" radius="md" shadow="xs" style={{ overflow: "hidden" }}>
+                <Group justify="space-between" mb="md">
+                    <Text fw={700} size="md" tt="uppercase" c="dimmed">
+                        Chi tiết trường ({filteredSchools.length})
+                    </Text>
+
+                    <Group gap={8}>
+                        <TextInput
+                            placeholder="Tìm trường hoặc ID..."
+                            leftSection={<IconSearch size={14} />}
+                            value={search}
+                            onChange={(e) => setSearch(e.currentTarget.value)}
+                            size="sm"
+                            w={220}
+                        />
+                        <Select
+                            placeholder="Trạng thái"
+                            data={[
+                                { value: "new", label: "Đăng ký mới" },
+                                { value: "renew", label: "Gia hạn" },
+                                { value: "not_started", label: "Chưa triển khai" },
+                                { value: "graduated", label: "Tốt nghiệp" },
+                                { value: "cancelled", label: "Hủy" },
+                            ]}
+                            value={statusFilter}
+                            onChange={(val) => setStatusFilter(val as RetentionStatus | null)}
+                            clearable
+                            size="sm"
+                            w={160}
+                        />
                     </Group>
-                </Stack>
+                </Group>
+
+                <Table
+                    striped
+                    highlightOnHover
+                    withTableBorder
+                    stickyHeader
+                    horizontalSpacing="sm"
+                    verticalSpacing="sm"
+                    style={{ minWidth: 1200 }}
+                >
+                    <Table.Thead>
+                        <Table.Tr>
+                            <Table.Th>STT</Table.Th>
+                            <Table.Th>ID</Table.Th>
+                            <Table.Th>Tên trường</Table.Th>
+                            <Table.Th>Khu vực</Table.Th>
+                            <Table.Th>Tỉnh</Table.Th>
+                            <Table.Th>Cấp học</Table.Th>
+                            <Table.Th>Kinh doanh</Table.Th>
+                            {PERIODS.map((period) => (
+                                <Table.Th key={period} ta="center">
+                                    {period}
+                                </Table.Th>
+                            ))}
+                        </Table.Tr>
+                    </Table.Thead>
+
+                    <Table.Tbody>
+                        {filteredSchools.map((school, index) => (
+                            <Table.Tr key={school.id}>
+                                <Table.Td>{index + 1}</Table.Td>
+                                <Table.Td>
+                                    <Badge variant="light" color="gray">{school.id}</Badge>
+                                </Table.Td>
+                                <Table.Td>
+                                    <Stack gap={2}>
+                                        <Text fw={600} size="sm">{school.schoolName}</Text>
+                                        <Text size="xs" c="dimmed">{school.province}</Text>
+                                    </Stack>
+                                </Table.Td>
+                                <Table.Td><Badge color="blue" variant="light">{school.area}</Badge></Table.Td>
+                                <Table.Td>{school.province}</Table.Td>
+                                <Table.Td><Badge color="violet" variant="light">{school.schoolLevel}</Badge></Table.Td>
+                                <Table.Td><Badge color="orange" variant="light">{school.businessName}</Badge></Table.Td>
+
+                                {PERIODS.map((period) => {
+                                    const retention = school.periods[period];
+
+                                    if (!retention) {
+                                        return (
+                                            <Table.Td key={period} ta="center">
+                                                <Text size="xs" c="dimmed">-</Text>
+                                            </Table.Td>
+                                        );
+                                    }
+
+                                    return (
+                                        <Table.Td key={period} ta="center">
+                                            <Stack gap={4} align="center">
+                                                <Text fw={700} size="sm">
+                                                    {retention.students.toLocaleString()}
+                                                </Text>
+                                                <Badge
+                                                    size="xs"
+                                                    color={STATUS_COLORS[retention.status]}
+                                                    variant="light"
+                                                >
+                                                    {STATUS_LABELS[retention.status]}
+                                                </Badge>
+                                            </Stack>
+                                        </Table.Td>
+                                    );
+                                })}
+                            </Table.Tr>
+                        ))}
+                    </Table.Tbody>
+                </Table>
             </Paper>
         </Stack>
     );

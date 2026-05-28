@@ -17,6 +17,8 @@ import {
     ThemeIcon,
     TextInput,
     Divider,
+    Pagination,
+    Box,
 } from "@mantine/core";
 import { BarChart } from '@mantine/charts';
 import '@mantine/charts/styles.css';
@@ -313,9 +315,9 @@ function StatCard({ stat }: { stat: StatItem }) {
     );
 }
 
-function RetentionBarChart({ title, data, dataKey }: { 
-    title: string; 
-    data: any[]; 
+function RetentionBarChart({ title, data, dataKey }: {
+    title: string;
+    data: any[];
     dataKey: string;
 }) {
     return (
@@ -349,6 +351,8 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<RetentionStatus | null>(null);
     const [vietnamTime, setVietnamTime] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState("10");
 
     const isMobile = useMediaQuery('(max-width: 768px)');
 
@@ -398,6 +402,12 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
             return matchSearch && matchStatus;
         });
     }, [search, statusFilter]);
+
+    const paginatedSchools = useMemo(() => {
+        const start = (page - 1) * Number(pageSize);
+        const end = start + Number(pageSize);
+        return filteredSchools.slice(start, end);
+    }, [filteredSchools, page, pageSize]);
 
     return (
         <Stack gap="lg" px="md" maw={1400} mx="auto">
@@ -622,6 +632,50 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
                         ))}
                     </Table.Tbody>
                 </Table>
+
+                {/* === PAGINATION === */}
+                <Box
+                    px="sm"
+                    py="xs"
+                    style={{
+                        borderTop: "1px solid var(--mantine-color-default-border)",
+                        background: "var(--mantine-color-gray-0)",
+                    }}
+                >
+                    <Group justify="space-between" wrap="wrap" gap={8}>
+                        <Text size="xs" c="dimmed">
+                            Hiển thị{" "}
+                            <b>
+                                {(page - 1) * Number(pageSize) + 1}–{Math.min(page * Number(pageSize), filteredSchools.length)}
+                            </b>{" "}
+                            trong tổng <b>{filteredSchools.length}</b> trường
+                        </Text>
+
+                        <Pagination
+                            total={Math.ceil(filteredSchools.length / Number(pageSize))}
+                            value={page}
+                            onChange={setPage}
+                            size="sm"
+                            radius="md"
+                        />
+
+                        <Group gap={6}>
+                            <Select
+                                data={["10", "20", "30", "50", "100"]}
+                                value={pageSize}
+                                onChange={(value) => {
+                                    setPageSize(value || "10");
+                                    setPage(1); // Reset về trang 1 khi thay đổi số lượng
+                                }}
+                                w={70}
+                                size="xs"
+                            />
+                            <Text size="xs" c="dimmed">
+                                / trang
+                            </Text>
+                        </Group>
+                    </Group>
+                </Box>
             </Paper>
         </Stack>
     );

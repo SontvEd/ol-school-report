@@ -14,11 +14,17 @@ import {
     Select,
     SegmentedControl,
     Table,
-    ThemeIcon,
     TextInput,
     Divider,
     Pagination,
     Box,
+    Button,
+    Tooltip,
+    Modal,
+    Grid,
+    RingProgress,
+    Center,
+    ThemeIcon,
 } from "@mantine/core";
 import { BarChart } from '@mantine/charts';
 import '@mantine/charts/styles.css';
@@ -33,10 +39,16 @@ import {
     IconBuildings,
     IconCalendar,
     IconClockCheck,
+    IconEye,
     IconHomeHand,
     IconMapPin,
     IconSchool,
     IconSearch,
+    IconHash,
+    IconTrendingUp,
+    IconTrendingDown,
+    IconMinus,
+    IconX,
 } from "@tabler/icons-react";
 import { useMediaQuery } from '@mantine/hooks';
 
@@ -63,6 +75,7 @@ export interface School {
     schoolName: string;
     area: string;
     province: string;
+    ward: string;
     schoolLevel: string;
     businessName: string;
     periods: Record<string, SchoolPeriodData>;
@@ -97,12 +110,20 @@ export const STATUS_COLORS: Record<RetentionStatus, string> = {
     cancelled: "red",
 };
 
+export const SCHOOL_LEVEL_COLOR: Record<string, string> = {
+    THPT: "blue",
+    THCS: "yellow",
+    "Tiểu học": "green",
+    "Liên cấp": "violet",
+};
+
 export const SCHOOLS: School[] = [
     {
         id: "S-00001",
         schoolName: "THPT Chuyên Hà Nội",
         area: "KV1",
         province: "Hà Nội",
+        ward: "Thanh Xuân",
         schoolLevel: "THPT",
         businessName: "KD1",
         periods: {
@@ -117,6 +138,7 @@ export const SCHOOLS: School[] = [
         schoolName: "THCS Đống Đa",
         area: "KV1",
         province: "Hà Nội",
+        ward: "Thanh Xuân",
         schoolLevel: "THCS",
         businessName: "KD1",
         periods: {
@@ -131,6 +153,7 @@ export const SCHOOLS: School[] = [
         schoolName: "Tiểu học Việt Úc",
         area: "KV2",
         province: "Đà Nẵng",
+        ward: "Thanh Xuân",
         schoolLevel: "Tiểu học",
         businessName: "KD2",
         periods: {
@@ -145,6 +168,7 @@ export const SCHOOLS: School[] = [
         schoolName: "Liên cấp Nguyễn Huệ",
         area: "KV3",
         province: "TP.HCM",
+        ward: "Thanh Xuân",
         schoolLevel: "Liên cấp",
         businessName: "KD3",
         periods: {
@@ -159,6 +183,7 @@ export const SCHOOLS: School[] = [
         schoolName: "THPT Lê Quý Đôn",
         area: "KV4",
         province: "Cần Thơ",
+        ward: "Thanh Xuân",
         schoolLevel: "THPT",
         businessName: "KD4",
         periods: {
@@ -173,6 +198,7 @@ export const SCHOOLS: School[] = [
         schoolName: "THCS Trần Phú",
         area: "KV2",
         province: "Huế",
+        ward: "Thanh Xuân",
         schoolLevel: "THCS",
         businessName: "KD2",
         periods: {
@@ -264,6 +290,20 @@ const QUICK_FILTERS = [
     { label: "Học sinh", count: 120, color: "green", icon: IconSchool },
 ];
 
+// ─── Helper: tính % retention giữa 2 kỳ ──────────────────────────────────────
+function calcRetentionPercent(current: number, previous: number | undefined): string | null {
+    if (previous === undefined || previous === 0) return null;
+    const pct = Math.round((current / previous) * 100);
+    return `${pct}%`;
+}
+
+function getRetentionColor(pct: number): string {
+    if (pct >= 100) return "green";
+    if (pct >= 80) return "blue";
+    if (pct >= 60) return "yellow";
+    return "red";
+}
+
 // ─── Sub Components ────────────────────────────────────────────────────────
 function StatCard({ stat }: { stat: StatItem }) {
     const Icon = stat.icon;
@@ -344,6 +384,232 @@ function RetentionBarChart({ title, data, dataKey }: {
     );
 }
 
+// ─── School Detail Modal ───────────────────────────────────────────────────
+function SchoolDetailModal({ school, opened, onClose }: {
+    school: School | null;
+    opened: boolean;
+    onClose: () => void;
+}) {
+    if (!school) return null;
+
+    const levelColor = SCHOOL_LEVEL_COLOR[school.schoolLevel] ?? "gray";
+
+    // Build chart data từ periods
+    const chartData = PERIODS.map((period, idx) => {
+        const data = school.periods[period];
+        const prevData = idx > 0 ? school.periods[PERIODS[idx - 1]] : undefined;
+        const pct = data && prevData && prevData.students > 0
+            ? Math.round((data.students / prevData.students) * 100)
+            : null;
+        return {
+            period,
+            "Học sinh": data?.students ?? 0,
+            "Retention %": pct,
+            status: data?.status ?? null,
+        };
+    });
+
+    // Tính overall retention (kỳ cuối / kỳ đầu có data)
+    const periodsWithStudents = PERIODS.filter(p => (school.periods[p]?.students ?? 0) > 0);
+    const firstStudents = periodsWithStudents.length > 0 ? school.periods[periodsWithStudents[0]].students : 0;
+    const lastStudents = periodsWithStudents.length > 0 ? school.periods[periodsWithStudents[periodsWithStudents.length - 1]].students : 0;
+    const overallPct = firstStudents > 0 ? Math.round((lastStudents / firstStudents) * 100) : 0;
+    const overallColor = getRetentionColor(overallPct);
+
+    return (
+        <Modal
+            opened={opened}
+            onClose={onClose}
+            size="xl"
+            radius="md"
+            title={
+                <Group gap="sm">
+                    <ThemeIcon color={levelColor} variant="light" size="lg" radius="md">
+                        <IconSchool size={18} />
+                    </ThemeIcon>
+                    <Stack gap={2}>
+                        <Text fw={700} size="md">{school.schoolName}</Text>
+                        <Text size="xs" c="dimmed">{school.id}</Text>
+                    </Stack>
+                </Group>
+            }
+        >
+            <Stack gap="md">
+                {/* Info Cards */}
+                <Grid>
+                    <Grid.Col span={6}>
+                        <Paper withBorder p="sm" radius="md">
+                            <Stack gap={4}>
+                                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Thông tin trường</Text>
+                                <Divider />
+                                <Group gap={6}>
+                                    <Text size="xs" c="dimmed" w={90}>Mã trường:</Text>
+                                    <Badge variant="light" color="gray" size="sm">{school.id}</Badge>
+                                </Group>
+                                <Group gap={6}>
+                                    <Text size="xs" c="dimmed" w={90}>Cấp học:</Text>
+                                    <Badge variant="light" color={levelColor} size="sm">{school.schoolLevel}</Badge>
+                                </Group>
+                                <Group gap={6}>
+                                    <Text size="xs" c="dimmed" w={90}>Khu vực:</Text>
+                                    <Badge variant="light" color="blue" size="sm">{school.area}</Badge>
+                                </Group>
+                                <Group gap={6}>
+                                    <Text size="xs" c="dimmed" w={90}>Kinh doanh:</Text>
+                                    <Badge variant="light" color="orange" size="sm">{school.businessName}</Badge>
+                                </Group>
+                                <Group gap={6}>
+                                    <Text size="xs" c="dimmed" w={90}>Tỉnh/TP:</Text>
+                                    <Text size="xs" fw={500}>{school.province}</Text>
+                                </Group>
+                                <Group gap={6}>
+                                    <Text size="xs" c="dimmed" w={90}>Quận/Phường:</Text>
+                                    <Text size="xs" fw={500}>{school.ward}</Text>
+                                </Group>
+                            </Stack>
+                        </Paper>
+                    </Grid.Col>
+
+                    <Grid.Col span={6}>
+                        <Paper withBorder p="sm" radius="md" h="100%">
+                            <Stack gap={4}>
+                                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Retention tổng thể</Text>
+                                <Divider />
+                                <Center mt="xs">
+                                    <RingProgress
+                                        size={120}
+                                        thickness={12}
+                                        roundCaps
+                                        sections={[{ value: Math.min(overallPct, 100), color: overallColor }]}
+                                        label={
+                                            <Center>
+                                                <Stack gap={0} align="center">
+                                                    <Text fw={700} size="md" c={`${overallColor}.6`}>{overallPct}%</Text>
+                                                    <Text size="10px" c="dimmed">retention</Text>
+                                                </Stack>
+                                            </Center>
+                                        }
+                                    />
+                                </Center>
+                                <Text size="xs" c="dimmed" ta="center">
+                                    {firstStudents.toLocaleString()} → {lastStudents.toLocaleString()} học sinh
+                                </Text>
+                            </Stack>
+                        </Paper>
+                    </Grid.Col>
+                </Grid>
+
+                {/* Period Details */}
+                <Paper withBorder p="sm" radius="md">
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb="sm">Chi tiết theo giai đoạn</Text>
+                    <Table striped withTableBorder highlightOnHover>
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>Giai đoạn</Table.Th>
+                                <Table.Th ta="center">Học sinh</Table.Th>
+                                <Table.Th ta="center">Trạng thái</Table.Th>
+                                <Table.Th ta="center">Retention</Table.Th>
+                                <Table.Th ta="center">Tăng/giảm</Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                            {PERIODS.map((period, idx) => {
+                                const data = school.periods[period];
+                                const prevData = idx > 0 ? school.periods[PERIODS[idx - 1]] : undefined;
+                                const pctStr = data && prevData ? calcRetentionPercent(data.students, prevData.students) : null;
+                                const pctNum = pctStr ? parseInt(pctStr) : null;
+                                const delta = data && prevData ? data.students - prevData.students : null;
+
+                                if (!data) {
+                                    return (
+                                        <Table.Tr key={period}>
+                                            <Table.Td>{period}</Table.Td>
+                                            <Table.Td ta="center"><Text size="xs" c="dimmed">—</Text></Table.Td>
+                                            <Table.Td ta="center"><Text size="xs" c="dimmed">—</Text></Table.Td>
+                                            <Table.Td ta="center"><Text size="xs" c="dimmed">—</Text></Table.Td>
+                                            <Table.Td ta="center"><Text size="xs" c="dimmed">—</Text></Table.Td>
+                                        </Table.Tr>
+                                    );
+                                }
+
+                                return (
+                                    <Table.Tr key={period}>
+                                        <Table.Td>
+                                            <Text size="sm" fw={500}>{period}</Text>
+                                        </Table.Td>
+                                        <Table.Td ta="center">
+                                            <Text size="sm" fw={700}>
+                                                {data.students.toLocaleString()}
+                                            </Text>
+                                        </Table.Td>
+                                        <Table.Td ta="center">
+                                            <Badge
+                                                size="xs"
+                                                color={STATUS_COLORS[data.status]}
+                                                variant="light"
+                                            >
+                                                {STATUS_LABELS[data.status]}
+                                            </Badge>
+                                        </Table.Td>
+                                        <Table.Td ta="center">
+                                            {pctNum !== null ? (
+                                                <Badge
+                                                    size="sm"
+                                                    color={getRetentionColor(pctNum)}
+                                                    variant="filled"
+                                                >
+                                                    {pctStr}
+                                                </Badge>
+                                            ) : (
+                                                <Text size="xs" c="dimmed">—</Text>
+                                            )}
+                                        </Table.Td>
+                                        <Table.Td ta="center">
+                                            {delta !== null ? (
+                                                <Group gap={3} justify="center">
+                                                    {delta > 0 ? (
+                                                        <IconTrendingUp size={14} color="var(--mantine-color-green-6)" />
+                                                    ) : delta < 0 ? (
+                                                        <IconTrendingDown size={14} color="var(--mantine-color-red-6)" />
+                                                    ) : (
+                                                        <IconMinus size={14} color="var(--mantine-color-gray-5)" />
+                                                    )}
+                                                    <Text
+                                                        size="xs"
+                                                        fw={600}
+                                                        c={delta > 0 ? "green.6" : delta < 0 ? "red.6" : "dimmed"}
+                                                    >
+                                                        {delta > 0 ? "+" : ""}{delta.toLocaleString()}
+                                                    </Text>
+                                                </Group>
+                                            ) : (
+                                                <Text size="xs" c="dimmed">—</Text>
+                                            )}
+                                        </Table.Td>
+                                    </Table.Tr>
+                                );
+                            })}
+                        </Table.Tbody>
+                    </Table>
+                </Paper>
+
+                {/* Mini Bar Chart */}
+                <Paper withBorder p="sm" radius="md">
+                    <Text size="xs" c="dimmed" tt="uppercase" fw={600} mb="sm">Biểu đồ học sinh theo giai đoạn</Text>
+                    <BarChart
+                        h={200}
+                        data={chartData}
+                        dataKey="period"
+                        series={[{ name: "Học sinh", color: `${levelColor}.5` }]}
+                        withTooltip
+                        barProps={{ radius: 4 }}
+                    />
+                </Paper>
+            </Stack>
+        </Modal>
+    );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────
 export default function ReportClient({ initialData }: { initialData?: any }) {
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>("Trường");
@@ -354,7 +620,16 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState("10");
 
+    // Modal state
+    const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+    const [modalOpened, setModalOpened] = useState(false);
+
     const isMobile = useMediaQuery('(max-width: 768px)');
+
+    const openDetail = (school: School) => {
+        setSelectedSchool(school);
+        setModalOpened(true);
+    };
 
     // Real-time Vietnam time
     useEffect(() => {
@@ -410,273 +685,321 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
     }, [filteredSchools, page, pageSize]);
 
     return (
-        <Stack gap="lg" px="md" maw={1400} mx="auto">
-            {/* Header */}
-            <Paper withBorder p="md" radius="md" shadow="xs">
-                <Group justify="space-between" wrap="nowrap">
-                    <Group gap="sm">
-                        {!isMobile && (
-                            <Image
-                                src="/Logo_at-02.png"
-                                alt="Logo"
-                                h={48}
-                                w="auto"
-                                fit="contain"
-                                fallbackSrc="https://placehold.co/160x48?text=Logo"
-                            />
-                        )}
-                        <Divider orientation="vertical" />
-                        <Stack gap={2}>
-                            <Title order={2} fw={700}>
-                                Tái đăng ký app Ôn luyện
-                            </Title>
-                            <Text size="sm" c="blue.6" fw={500}>
-                                Giai đoạn 2023 – 2026
-                            </Text>
-                            <Group gap={6}>
-                                <IconClockCheck size={16} color="gray" />
-                                <Text size="xs" c="dimmed">
-                                    Cập nhật lần cuối: {vietnamTime}
+        <>
+            <SchoolDetailModal
+                school={selectedSchool}
+                opened={modalOpened}
+                onClose={() => setModalOpened(false)}
+            />
+
+            <Stack gap="lg" px="md" maw={1400} mx="auto">
+                {/* Header */}
+                <Paper withBorder p="md" radius="md" shadow="xs">
+                    <Group justify="space-between" wrap="nowrap">
+                        <Group gap="sm">
+                            {!isMobile && (
+                                <Image
+                                    src="/Logo_at-02.png"
+                                    alt="Logo"
+                                    h={48}
+                                    w="auto"
+                                    fit="contain"
+                                    fallbackSrc="https://placehold.co/160x48?text=Logo"
+                                />
+                            )}
+                            <Divider orientation="vertical" />
+                            <Stack gap={2}>
+                                <Title order={2} fw={700}>
+                                    Tái đăng ký app Ôn luyện
+                                </Title>
+                                <Text size="sm" c="blue.6" fw={500}>
+                                    Giai đoạn 2023 – 2026
                                 </Text>
-                            </Group>
-                        </Stack>
-                    </Group>
-                    <RefreshButton />
-                </Group>
-            </Paper>
-
-            {/* Sticky Filters */}
-            <Paper
-                withBorder
-                p="md"
-                radius="md"
-                shadow={isScrolled ? "sm" : "xs"}
-                style={{
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                    backgroundColor: isScrolled ? "var(--mantine-color-gray-1)" : "white",
-                }}
-            >
-                {/* Period + Filters */}
-                <Group justify="space-between" wrap="wrap" gap="md">
-                    <Group gap={8}>
-                        <Group gap={6}>
-                            <IconCalendar size={20} />
-                            <Text fw={500} tt="uppercase" size="md">
-                                Giai đoạn
-                            </Text>
+                                <Group gap={6}>
+                                    <IconClockCheck size={16} color="gray" />
+                                    <Text size="xs" c="dimmed">
+                                        Cập nhật lần cuối: {vietnamTime}
+                                    </Text>
+                                </Group>
+                            </Stack>
                         </Group>
-                        <SegmentedControl data={PERIODS} defaultValue={PERIODS[0]} size="sm" radius="md" />
+                        <RefreshButton />
                     </Group>
+                </Paper>
 
-                    <Group gap="sm" wrap="nowrap">
-                        <Select placeholder="Khu vực" data={["Tất cả", "KV1", "KV2", "KV3", "KV4"]} defaultValue="Tất cả" leftSection={<IconMapPin size={16} />} />
-                        <Select placeholder="Kinh doanh" data={["Tất cả", "KD1", "KD2", "KD3", "KD4"]} defaultValue="Tất cả" leftSection={<IconBriefcase size={16} />} />
-                        <Select placeholder="Cấp học" data={["Tất cả", "Tiểu học", "THCS", "THPT", "Liên cấp"]} defaultValue="Tất cả" leftSection={<IconBookmark size={16} />} />
-                    </Group>
-                </Group>
-
-                {/* Quick Filters */}
-                <Group gap="sm" mt="md">
-                    {QUICK_FILTERS.map(({ label, count, color, icon: Icon }) => (
-                        <Pill
-                            key={label}
-                            size="sm"
-                            onClick={() => setActiveQuickFilter(activeQuickFilter === label ? null : label)}
-                            style={{
-                                cursor: "pointer",
-                                border: `1.5px solid var(--mantine-color-${color}-${activeQuickFilter === label ? '9' : '3'})`,
-                                background: activeQuickFilter === label
-                                    ? `var(--mantine-color-${color}-light)`
-                                    : `var(--mantine-color-${color}-0)`,
-                                color: `var(--mantine-color-${color}-${activeQuickFilter === label ? '9' : '6'})`,
-                            }}
-                        >
-                            <Group gap={6} wrap="nowrap">
-                                <Icon size={18} />
-                                <Text>{label} ({count})</Text>
-                            </Group>
-                        </Pill>
-                    ))}
-                </Group>
-            </Paper>
-
-            {/* Overview Section */}
-            <Paper withBorder p="md" radius="md" shadow="xs">
-                <Text fw={700} size="md" tt="uppercase" c="dimmed" mb="md">
-                    TỔNG QUAN
-                </Text>
-
-                <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
-                    {STATS.map((stat) => (
-                        <StatCard key={stat.label} stat={stat} />
-                    ))}
-                </SimpleGrid>
-
-                <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mt="xl">
-                    <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriod} dataKey="period" />
-                    <RetentionBarChart title="Retention theo khu vực" data={retentionByArea} dataKey="area" />
-                    <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusiness} dataKey="business" />
-                    <RetentionBarChart title="Retention theo cấp học" data={retentionBySchoolLevel} dataKey="schoolLevel" />
-                </SimpleGrid>
-            </Paper>
-
-            {/* School Detail Table */}
-            <Paper withBorder p="md" radius="md" shadow="xs" style={{ overflow: "hidden" }}>
-                <Group justify="space-between" mb="md">
-                    <Text fw={700} size="md" tt="uppercase" c="dimmed">
-                        Chi tiết trường ({filteredSchools.length})
-                    </Text>
-
-                    <Group gap={8}>
-                        <TextInput
-                            placeholder="Tìm trường hoặc ID..."
-                            leftSection={<IconSearch size={14} />}
-                            value={search}
-                            onChange={(e) => setSearch(e.currentTarget.value)}
-                            size="sm"
-                            w={220}
-                        />
-                        <Select
-                            placeholder="Trạng thái"
-                            data={[
-                                { value: "new", label: "Đăng ký mới" },
-                                { value: "renew", label: "Gia hạn" },
-                                { value: "not_started", label: "Chưa triển khai" },
-                                { value: "graduated", label: "Tốt nghiệp" },
-                                { value: "cancelled", label: "Hủy" },
-                            ]}
-                            value={statusFilter}
-                            onChange={(val) => setStatusFilter(val as RetentionStatus | null)}
-                            clearable
-                            size="sm"
-                            w={160}
-                        />
-                    </Group>
-                </Group>
-
-                <Table
-                    striped
-                    highlightOnHover
-                    withTableBorder
-                    stickyHeader
-                    horizontalSpacing="sm"
-                    verticalSpacing="sm"
-                    style={{ minWidth: 1200 }}
-                >
-                    <Table.Thead>
-                        <Table.Tr>
-                            <Table.Th>STT</Table.Th>
-                            <Table.Th>ID</Table.Th>
-                            <Table.Th>Tên trường</Table.Th>
-                            <Table.Th>Khu vực</Table.Th>
-                            <Table.Th>Tỉnh</Table.Th>
-                            <Table.Th>Cấp học</Table.Th>
-                            <Table.Th>Kinh doanh</Table.Th>
-                            {PERIODS.map((period) => (
-                                <Table.Th key={period} ta="center">
-                                    {period}
-                                </Table.Th>
-                            ))}
-                        </Table.Tr>
-                    </Table.Thead>
-
-                    <Table.Tbody>
-                        {filteredSchools.map((school, index) => (
-                            <Table.Tr key={school.id}>
-                                <Table.Td>{index + 1}</Table.Td>
-                                <Table.Td>
-                                    <Badge variant="light" color="gray">{school.id}</Badge>
-                                </Table.Td>
-                                <Table.Td>
-                                    <Stack gap={2}>
-                                        <Text fw={600} size="sm">{school.schoolName}</Text>
-                                        <Text size="xs" c="dimmed">{school.province}</Text>
-                                    </Stack>
-                                </Table.Td>
-                                <Table.Td><Badge color="blue" variant="light">{school.area}</Badge></Table.Td>
-                                <Table.Td>{school.province}</Table.Td>
-                                <Table.Td><Badge color="violet" variant="light">{school.schoolLevel}</Badge></Table.Td>
-                                <Table.Td><Badge color="orange" variant="light">{school.businessName}</Badge></Table.Td>
-
-                                {PERIODS.map((period) => {
-                                    const retention = school.periods[period];
-
-                                    if (!retention) {
-                                        return (
-                                            <Table.Td key={period} ta="center">
-                                                <Text size="xs" c="dimmed">-</Text>
-                                            </Table.Td>
-                                        );
-                                    }
-
-                                    return (
-                                        <Table.Td key={period} ta="center">
-                                            <Stack gap={4} align="center">
-                                                <Text fw={700} size="sm">
-                                                    {retention.students.toLocaleString()}
-                                                </Text>
-                                                <Badge
-                                                    size="xs"
-                                                    color={STATUS_COLORS[retention.status]}
-                                                    variant="light"
-                                                >
-                                                    {STATUS_LABELS[retention.status]}
-                                                </Badge>
-                                            </Stack>
-                                        </Table.Td>
-                                    );
-                                })}
-                            </Table.Tr>
-                        ))}
-                    </Table.Tbody>
-                </Table>
-
-                {/* === PAGINATION === */}
-                <Box
-                    px="sm"
-                    py="xs"
+                {/* Sticky Filters */}
+                <Paper
+                    withBorder
+                    p="md"
+                    radius="md"
+                    shadow={isScrolled ? "sm" : "xs"}
                     style={{
-                        borderTop: "1px solid var(--mantine-color-default-border)",
-                        background: "var(--mantine-color-gray-0)",
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 100,
+                        backgroundColor: isScrolled ? "var(--mantine-color-gray-1)" : "white",
                     }}
                 >
-                    <Group justify="space-between" wrap="wrap" gap={8}>
-                        <Text size="xs" c="dimmed">
-                            Hiển thị{" "}
-                            <b>
-                                {(page - 1) * Number(pageSize) + 1}–{Math.min(page * Number(pageSize), filteredSchools.length)}
-                            </b>{" "}
-                            trong tổng <b>{filteredSchools.length}</b> trường
-                        </Text>
+                    <Group justify="space-between" wrap="wrap" gap="md">
+                        <Group gap={8}>
+                            <Group gap={6}>
+                                <IconCalendar size={20} />
+                                <Text fw={500} tt="uppercase" size="md">
+                                    Giai đoạn
+                                </Text>
+                            </Group>
+                            <SegmentedControl data={PERIODS} defaultValue={PERIODS[0]} size="sm" radius="md" />
+                        </Group>
 
-                        <Pagination
-                            total={Math.ceil(filteredSchools.length / Number(pageSize))}
-                            value={page}
-                            onChange={setPage}
-                            size="sm"
-                            radius="md"
-                        />
-
-                        <Group gap={6}>
-                            <Select
-                                data={["10", "20", "30", "50", "100"]}
-                                value={pageSize}
-                                onChange={(value) => {
-                                    setPageSize(value || "10");
-                                    setPage(1); // Reset về trang 1 khi thay đổi số lượng
-                                }}
-                                w={70}
-                                size="xs"
-                            />
-                            <Text size="xs" c="dimmed">
-                                / trang
-                            </Text>
+                        <Group gap="sm" wrap="nowrap">
+                            <Select placeholder="Khu vực" data={["Tất cả", "KV1", "KV2", "KV3", "KV4"]} defaultValue="Tất cả" leftSection={<IconMapPin size={16} />} />
+                            <Select placeholder="Kinh doanh" data={["Tất cả", "KD1", "KD2", "KD3", "KD4"]} defaultValue="Tất cả" leftSection={<IconBriefcase size={16} />} />
+                            <Select placeholder="Cấp học" data={["Tất cả", "Tiểu học", "THCS", "THPT", "Liên cấp"]} defaultValue="Tất cả" leftSection={<IconBookmark size={16} />} />
                         </Group>
                     </Group>
-                </Box>
-            </Paper>
-        </Stack>
+
+                    <Group gap="sm" mt="md">
+                        {QUICK_FILTERS.map(({ label, count, color, icon: Icon }) => (
+                            <Pill
+                                key={label}
+                                size="sm"
+                                onClick={() => setActiveQuickFilter(activeQuickFilter === label ? null : label)}
+                                style={{
+                                    cursor: "pointer",
+                                    border: `1.5px solid var(--mantine-color-${color}-${activeQuickFilter === label ? '9' : '3'})`,
+                                    background: activeQuickFilter === label
+                                        ? `var(--mantine-color-${color}-light)`
+                                        : `var(--mantine-color-${color}-0)`,
+                                    color: `var(--mantine-color-${color}-${activeQuickFilter === label ? '9' : '6'})`,
+                                }}
+                            >
+                                <Group gap={6} wrap="nowrap">
+                                    <Icon size={18} />
+                                    <Text>{label} ({count})</Text>
+                                </Group>
+                            </Pill>
+                        ))}
+                    </Group>
+                </Paper>
+
+                {/* Overview Section */}
+                <Paper withBorder p="md" radius="md" shadow="xs">
+                    <Text fw={700} size="md" tt="uppercase" c="dimmed" mb="md">
+                        TỔNG QUAN
+                    </Text>
+
+                    <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
+                        {STATS.map((stat) => (
+                            <StatCard key={stat.label} stat={stat} />
+                        ))}
+                    </SimpleGrid>
+
+                    <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mt="xl">
+                        <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriod} dataKey="period" />
+                        <RetentionBarChart title="Retention theo khu vực" data={retentionByArea} dataKey="area" />
+                        <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusiness} dataKey="business" />
+                        <RetentionBarChart title="Retention theo cấp học" data={retentionBySchoolLevel} dataKey="schoolLevel" />
+                    </SimpleGrid>
+                </Paper>
+
+                {/* School Detail Table */}
+                <Paper withBorder p="md" radius="md" shadow="xs" style={{ overflow: "hidden" }}>
+                    <Group justify="space-between" mb="md">
+                        <Text fw={700} size="md" tt="uppercase" c="dimmed">
+                            Chi tiết trường ({filteredSchools.length})
+                        </Text>
+
+                        <Group gap={8}>
+                            <TextInput
+                                placeholder="Tìm trường hoặc ID..."
+                                leftSection={<IconSearch size={14} />}
+                                value={search}
+                                onChange={(e) => setSearch(e.currentTarget.value)}
+                                size="sm"
+                                w={220}
+                            />
+                            <Select
+                                placeholder="Trạng thái"
+                                data={[
+                                    { value: "new", label: "Đăng ký mới" },
+                                    { value: "renew", label: "Gia hạn" },
+                                    { value: "not_started", label: "Chưa triển khai" },
+                                    { value: "graduated", label: "Tốt nghiệp" },
+                                    { value: "cancelled", label: "Hủy" },
+                                ]}
+                                value={statusFilter}
+                                onChange={(val) => setStatusFilter(val as RetentionStatus | null)}
+                                clearable
+                                size="sm"
+                                w={160}
+                            />
+                        </Group>
+                    </Group>
+
+                    <Table
+                        striped
+                        highlightOnHover
+                        withTableBorder
+                        stickyHeader
+                        horizontalSpacing="sm"
+                        verticalSpacing="sm"
+                        style={{ minWidth: 1200 }}
+                    >
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>STT</Table.Th>
+                                <Table.Th>ID</Table.Th>
+                                <Table.Th>Tên trường</Table.Th>
+                                <Table.Th>Khu vực</Table.Th>
+                                <Table.Th>Kinh doanh</Table.Th>
+                                {PERIODS.map((period) => (
+                                    <Table.Th key={period} ta="center">
+                                        {period}
+                                    </Table.Th>
+                                ))}
+                                <Table.Th></Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+
+                        <Table.Tbody>
+                            {paginatedSchools.map((school, index) => {
+                                const levelColor = SCHOOL_LEVEL_COLOR[school.schoolLevel] ?? "gray";
+
+                                return (
+                                    <Table.Tr key={school.id}>
+                                        <Table.Td>{(page - 1) * Number(pageSize) + index + 1}</Table.Td>
+                                        <Table.Td>
+                                            <Badge variant="light" color="gray">{school.id}</Badge>
+                                        </Table.Td>
+                                        <Table.Td>
+                                            <Stack gap={2}>
+                                                <Text fw={600} size="sm">{school.schoolName}</Text>
+                                                <Group gap={4}>
+                                                    {/* schoolLevel với màu tương ứng */}
+                                                    <Badge
+                                                        size="xs"
+                                                        color={levelColor}
+                                                        variant="light"
+                                                    >
+                                                        {school.schoolLevel}
+                                                    </Badge>
+                                                    <Text size="xs" c="dimmed">• {school.ward} - {school.province}</Text>
+                                                </Group>
+                                            </Stack>
+                                        </Table.Td>
+                                        <Table.Td><Badge color="blue" variant="light">{school.area}</Badge></Table.Td>
+                                        <Table.Td><Badge color="orange" variant="light">{school.businessName}</Badge></Table.Td>
+
+                                        {PERIODS.map((period, pIdx) => {
+                                            const retention = school.periods[period];
+                                            const prevPeriod = pIdx > 0 ? school.periods[PERIODS[pIdx - 1]] : undefined;
+
+                                            if (!retention) {
+                                                return (
+                                                    <Table.Td key={period} ta="center">
+                                                        <Text size="xs" c="dimmed">-</Text>
+                                                    </Table.Td>
+                                                );
+                                            }
+
+                                            const pctStr = prevPeriod
+                                                ? calcRetentionPercent(retention.students, prevPeriod.students)
+                                                : null;
+                                            const pctNum = pctStr ? parseInt(pctStr) : null;
+                                            const retColor = pctNum !== null ? getRetentionColor(pctNum) : STATUS_COLORS[retention.status];
+
+                                            return (
+                                                <Table.Td key={period} ta="center">
+                                                    <Stack gap={4} align="center">
+                                                        <Text fw={700} size="sm">
+                                                            {retention.students.toLocaleString()}
+                                                        </Text>
+                                                        {pctStr ? (
+                                                            <Badge
+                                                                size="xs"
+                                                                color={retColor}
+                                                                variant="filled"
+                                                            >
+                                                                {pctStr}
+                                                            </Badge>
+                                                        ) : (
+                                                            // Kỳ đầu tiên: hiển thị status label vì chưa có kỳ trước
+                                                            <Badge
+                                                                size="xs"
+                                                                color={STATUS_COLORS[retention.status]}
+                                                                variant="light"
+                                                            >
+                                                                {STATUS_LABELS[retention.status]}
+                                                            </Badge>
+                                                        )}
+                                                    </Stack>
+                                                </Table.Td>
+                                            );
+                                        })}
+
+                                        <Table.Td>
+                                            <Tooltip label="Xem chi tiết" withArrow>
+                                                <Button
+                                                    variant="light"
+                                                    color="gray"
+                                                    size="xs"
+                                                    onClick={() => openDetail(school)}
+                                                >
+                                                    <IconEye size={16} />
+                                                </Button>
+                                            </Tooltip>
+                                        </Table.Td>
+                                    </Table.Tr>
+                                );
+                            })}
+                        </Table.Tbody>
+                    </Table>
+
+                    {/* === PAGINATION === */}
+                    <Box
+                        px="sm"
+                        py="xs"
+                        style={{
+                            borderTop: "1px solid var(--mantine-color-default-border)",
+                            background: "var(--mantine-color-gray-0)",
+                        }}
+                    >
+                        <Group justify="space-between" wrap="wrap" gap={8}>
+                            <Text size="xs" c="dimmed">
+                                Hiển thị{" "}
+                                <b>
+                                    {(page - 1) * Number(pageSize) + 1}–{Math.min(page * Number(pageSize), filteredSchools.length)}
+                                </b>{" "}
+                                trong tổng <b>{filteredSchools.length}</b> trường
+                            </Text>
+
+                            <Pagination
+                                total={Math.ceil(filteredSchools.length / Number(pageSize))}
+                                value={page}
+                                onChange={setPage}
+                                size="sm"
+                                radius="md"
+                            />
+
+                            <Group gap={6}>
+                                <Select
+                                    data={["10", "20", "30", "50", "100"]}
+                                    value={pageSize}
+                                    onChange={(value) => {
+                                        setPageSize(value || "10");
+                                        setPage(1);
+                                    }}
+                                    w={70}
+                                    size="xs"
+                                />
+                                <Text size="xs" c="dimmed">
+                                    / trang
+                                </Text>
+                            </Group>
+                        </Group>
+                    </Box>
+                </Paper>
+            </Stack>
+        </>
     );
 }

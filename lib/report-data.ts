@@ -7,7 +7,8 @@ export type RetentionStatus =
 
 export interface SchoolPeriodData {
     students: number;
-    status: RetentionStatus;
+    status: RetentionStatus;           // từ sheet "Trường" (dùng cho badge bảng)
+    retentionStatus?: RetentionStatus; // từ RetentionSchools (dùng cho modal chi tiết)
     newStudents?: number;
     renewed?: number;
     graduated?: number;
@@ -30,11 +31,11 @@ export type SheetRow = Record<string, string | number | undefined>;
 export const DEFAULT_PERIODS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
 
 export const STATUS_LABELS: Record<RetentionStatus, string> = {
-    new: "Mới",
+    new: "Đăng ký mới",
     renew: "Gia hạn",
     graduated: "Tốt nghiệp",
     not_started: "Chưa triển khai",
-    cancelled: "Hủy",
+    cancelled: "Hủy đăng ký",
 };
 
 export const STATUS_COLORS: Record<RetentionStatus, string> = {
@@ -52,8 +53,18 @@ export const SCHOOL_LEVEL_COLOR: Record<string, string> = {
     "Liên cấp": "violet",
 };
 
+// Map các cột ngắn trong sheet "Trường" (VD: "23 - 24") sang tên giai đoạn đầy đủ (VD: "2023-2024")
+export const SHORT_PERIOD_COLS: Record<string, string> = {
+    "23 - 24": "2023-2024",
+    "24 - 25": "2024-2025",
+    "25 - 26": "2025-2026",
+    "26 - 27": "2026-2027",
+};
+
 export function stripDiacritics(value: string) {
     return value
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase()
@@ -168,8 +179,39 @@ export function normalizeSchools(rows: SheetRow[], retentionRows: SheetRow[], pe
             const schoolName = pickValue(row, ["Tên trường", "schoolName", "Trường"]);
             if (!schoolName && !id) return null;
 
+            // Đọc trạng thái giai đoạn trực tiếp từ cột trong sheet "Trường"
+            // Lưu theo nhiều format để match với periods từ 0.Setting dù format nào
+            const schoolRowStatus: Record<string, RetentionStatus> = {};
+            for (const [col, fullPeriod] of Object.entries(SHORT_PERIOD_COLS)) {
+                const rawStatus = String(row[col] ?? "").trim();
+                if (rawStatus) {
+                    const status = normalizeRetentionStatus(rawStatus);
+                    schoolRowStatus[fullPeriod] = status;                          // "2023-2024"
+                    schoolRowStatus[col] = status;                                  // "23 - 24" (tên cột gốc)
+                    schoolRowStatus[col.replace(/\s/g, "")] = status;              // "23-24"
+                    schoolRowStatus[col.replace(/\s/g, "").toLowerCase()] = status; // "23-24" lowercase
+                    schoolRowStatus[fullPeriod.replace(/\s/g, "").toLowerCase()] = status; // "2023-2024" compact
+                }
+            }
+
             const periodsData = periods.reduce<Record<string, SchoolPeriodData>>((acc, period) => {
-                acc[period] = retentionMap.get(id)?.[period] ?? { students: 0, status: "not_started" };
+                const retData = retentionMap.get(id)?.[period];
+                // Ưu tiên trạng thái từ cột sheet "Trường", fallback sang RetentionSchools
+                // Thử nhiều format key: đúng nguyên văn → bỏ khoảng trắng → lowercase compact
+                const compactPeriod = period.replace(/\s/g, "").toLowerCase();
+                const status = schoolRowStatus[period]
+                    ?? schoolRowStatus[compactPeriod]
+                    ?? retData?.status
+                    ?? "not_started";
+                acc[period] = {
+                    students: retData?.students ?? 0,
+                    status,
+                    retentionStatus: retData?.status, // luôn từ RetentionSchools
+                    newStudents: retData?.newStudents ?? 0,
+                    renewed: retData?.renewed ?? 0,
+                    graduated: retData?.graduated ?? 0,
+                    cancelled: retData?.cancelled ?? 0,
+                };
                 return acc;
             }, {});
 
@@ -211,6 +253,46 @@ export function aggregateSchoolsByPeriod(schools: School[], period: string): Agg
 
     return aggregate;
 }
+
+/**
+ * Tổng hợp "Tất cả": mỗi trường được đếm một lần
+ * dựa trên status của kỳ MỚI NHẤT có dữ liệu thực (students > 0 hoặc status khác not_started).
+ */
+export function aggregateSchoolsAllPeriods(schools: School[], tablePeriods: string[]): AggregateRow {
+    const reversedPeriods = [...tablePeriods].reverse(); // ưu tiên kỳ mới nhất
+    const aggregate: AggregateRow = {
+        period: "Tất cả",
+        moi: 0,
+        giaHan: 0,
+        totNghiep: 0,
+        chuaTrienKhai: 0,
+        huy: 0,
+        tong: 0,
+    };
+
+    schools.forEach(school => {
+        // Tìm kỳ mới nhất có dữ liệu thực (students > 0 hoặc status không phải not_started)
+        const activePeriod =
+            reversedPeriods.find(p => {
+                const d = school.periods[p];
+                return d && ((d.students ?? 0) > 0 || d.status !== "not_started");
+            }) ?? reversedPeriods[0];
+
+        const periodData = school.periods[activePeriod];
+        if (!periodData) return;
+
+        aggregate.tong += 1;
+        if (periodData.status === "new") aggregate.moi += 1;
+        else if (periodData.status === "renew") aggregate.giaHan += 1;
+        else if (periodData.status === "graduated") aggregate.totNghiep += 1;
+        else if (periodData.status === "not_started") aggregate.chuaTrienKhai += 1;
+        else if (periodData.status === "cancelled") aggregate.huy += 1;
+    });
+
+    return aggregate;
+}
+
+
 
 export function aggregateSchoolsByGroup(
     schools: School[],

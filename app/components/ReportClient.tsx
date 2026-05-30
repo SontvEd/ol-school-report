@@ -61,6 +61,7 @@ import {
     normalizeSchools,
     aggregateSchoolsByPeriod,
     aggregateSchoolsByGroup,
+    aggregateSchoolsAllPeriods,
     type RetentionStatus,
     type School,
     type SheetRow,
@@ -75,8 +76,8 @@ interface StatItem {
     trendType: "up" | "down" | "neutral";
     accentColor: string;
 }
-function buildOverviewStats(schools: School[], period: string, previousPeriod?: string): StatItem[] {
-    const current = aggregateSchoolsByPeriod(schools, period);
+function buildOverviewStats(schools: School[], period: string, previousPeriod?: string, precomputedAggregate?: ReturnType<typeof aggregateSchoolsByPeriod>): StatItem[] {
+    const current = precomputedAggregate ?? aggregateSchoolsByPeriod(schools, period);
     const previous = previousPeriod ? aggregateSchoolsByPeriod(schools, previousPeriod) : null;
     const total = Math.max(schools.length, 1);
 
@@ -99,12 +100,13 @@ function buildOverviewStats(schools: School[], period: string, previousPeriod?: 
     ];
 }
 
+
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 function StatCard({ stat }: { stat: StatItem }) {
     const Icon = stat.icon;
     const TrendIcon =
         stat.trendType === "up" ? IconArrowUp :
-        stat.trendType === "down" ? IconArrowDown : null;
+            stat.trendType === "down" ? IconArrowDown : null;
 
     return (
         <Paper
@@ -161,11 +163,11 @@ function RetentionBarChart({ title, data, dataKey }: {
                 withLegend
                 legendProps={{ verticalAlign: "bottom", wrapperStyle: { paddingTop: 12, fontSize: 13 } }}
                 series={[
-                    { name: "moi",            label: "Mới",              color: "green.6"  },
-                    { name: "giaHan",         label: "Gia hạn",          color: "blue.6"   },
-                    { name: "totNghiep",      label: "Tốt nghiệp",       color: "violet.6" },
-                    { name: "chuaTrienKhai",  label: "Chưa triển khai",  color: "yellow.6" },
-                    { name: "huy",            label: "Hủy",              color: "red.6"    },
+                    { name: "moi", label: "Đăng ký mới", color: "green.6" },
+                    { name: "giaHan", label: "Gia hạn", color: "blue.6" },
+                    { name: "totNghiep", label: "Tốt nghiệp", color: "violet.6" },
+                    { name: "chuaTrienKhai", label: "Chưa triển khai", color: "yellow.6" },
+                    { name: "huy", label: "Hủy đăng ký", color: "red.6" },
                 ]}
             />
         </Paper>
@@ -184,10 +186,10 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
     const levelColor = SCHOOL_LEVEL_COLOR[school.schoolLevel] ?? "gray";
 
     // Tổng hợp toàn bộ giai đoạn
-    const totalNew       = periods.reduce((s, p) => s + (school.periods[p]?.newStudents ?? 0), 0);
-    const totalRenewed   = periods.reduce((s, p) => s + (school.periods[p]?.renewed    ?? 0), 0);
-    const totalCancelled = periods.reduce((s, p) => s + (school.periods[p]?.cancelled  ?? 0), 0);
-    const totalGraduated = periods.reduce((s, p) => s + (school.periods[p]?.graduated  ?? 0), 0);
+    const totalNew = periods.reduce((s, p) => s + (school.periods[p]?.newStudents ?? 0), 0);
+    const totalRenewed = periods.reduce((s, p) => s + (school.periods[p]?.renewed ?? 0), 0);
+    const totalCancelled = periods.reduce((s, p) => s + (school.periods[p]?.cancelled ?? 0), 0);
+    const totalGraduated = periods.reduce((s, p) => s + (school.periods[p]?.graduated ?? 0), 0);
 
     // Overall retention (kỳ đầu → kỳ cuối có học sinh)
     const periodsWithStudents = periods.filter(p => (school.periods[p]?.students ?? 0) > 0);
@@ -195,12 +197,12 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
         ? school.periods[periodsWithStudents[0]].students : 0;
     const lastStudents = periodsWithStudents.length > 0
         ? school.periods[periodsWithStudents[periodsWithStudents.length - 1]].students : 0;
-    const overallPct   = firstStudents > 0 ? Math.round((lastStudents / firstStudents) * 100) : 0;
+    const overallPct = firstStudents > 0 ? Math.round((lastStudents / firstStudents) * 100) : 0;
     const overallColor = getRetentionColor(overallPct);
 
     // Build line chart data
     const lineData = periods.map((period, idx) => {
-        const data     = school.periods[period];
+        const data = school.periods[period];
         const prevData = idx > 0 ? school.periods[periods[idx - 1]] : undefined;
         const retentionPct =
             data && prevData && prevData.students > 0
@@ -208,10 +210,10 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                 : null;
         return {
             period,
-            "Đăng ký mới":           data?.newStudents  ?? null,
-            "Tái đăng ký":           data?.renewed      ?? null,
-            "Tốt nghiệp":            data?.graduated    ?? null,
-            "Hủy đăng ký":           data?.cancelled    ?? null,
+            "Đăng ký mới": data?.newStudents ?? null,
+            "Tái đăng ký": data?.renewed ?? null,
+            "Tốt nghiệp": data?.graduated ?? null,
+            "Hủy đăng ký": data?.cancelled ?? null,
             "Tỷ lệ tái đăng ký (%)": retentionPct,
         };
     });
@@ -292,10 +294,10 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                         size={130}
                                         thickness={26}
                                         data={[
-                                            { name: "Đăng ký mới", value: totalNew,       color: "blue.6"   },
-                                            { name: "Gia hạn",     value: totalRenewed,   color: "teal.6"   },
-                                            { name: "Hủy đăng ký", value: totalCancelled, color: "red.5"    },
-                                            { name: "Tốt nghiệp",  value: totalGraduated, color: "violet.5" },
+                                            { name: "Đăng ký mới", value: totalNew, color: "blue.6" },
+                                            { name: "Gia hạn", value: totalRenewed, color: "teal.6" },
+                                            { name: "Hủy đăng ký", value: totalCancelled, color: "red.5" },
+                                            { name: "Tốt nghiệp", value: totalGraduated, color: "violet.5" },
                                         ]}
                                         tooltipDataSource="segment"
                                         withTooltip
@@ -329,13 +331,13 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                             </Table.Thead>
                             <Table.Tbody>
                                 {periods.map((period, idx) => {
-                                    const data     = school.periods[period];
+                                    const data = school.periods[period];
                                     const prevData = idx > 0 ? school.periods[periods[idx - 1]] : undefined;
-                                    const pctStr   = data && prevData
+                                    const pctStr = data && prevData
                                         ? calcRetentionPercent(data.students, prevData.students)
                                         : null;
                                     const pctNum = pctStr ? parseInt(pctStr) : null;
-                                    const delta  = data && prevData
+                                    const delta = data && prevData
                                         ? data.students - prevData.students
                                         : null;
 
@@ -361,9 +363,14 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                                 <Text size="sm" fw={700}>{data.students.toLocaleString()}</Text>
                                             </Table.Td>
                                             <Table.Td ta="center">
-                                                <Badge size="xs" color={STATUS_COLORS[data.status]} variant="light">
-                                                    {STATUS_LABELS[data.status]}
-                                                </Badge>
+                                                {(() => {
+                                                    const s = data.retentionStatus ?? data.status;
+                                                    return (
+                                                        <Badge size="xs" color={STATUS_COLORS[s]} variant="light">
+                                                            {STATUS_LABELS[s]}
+                                                        </Badge>
+                                                    );
+                                                })()}
                                             </Table.Td>
                                             <Table.Td ta="center">
                                                 <Text size="xs">{data.newStudents?.toLocaleString() ?? "—"}</Text>
@@ -390,10 +397,10 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                                 {delta !== null ? (
                                                     <Group gap={3} justify="center">
                                                         {delta > 0
-                                                            ? <IconTrendingUp  size={14} color="var(--mantine-color-green-6)" />
+                                                            ? <IconTrendingUp size={14} color="var(--mantine-color-green-6)" />
                                                             : delta < 0
-                                                            ? <IconTrendingDown size={14} color="var(--mantine-color-red-6)" />
-                                                            : <IconMinus       size={14} color="var(--mantine-color-gray-5)" />
+                                                                ? <IconTrendingDown size={14} color="var(--mantine-color-red-6)" />
+                                                                : <IconMinus size={14} color="var(--mantine-color-gray-5)" />
                                                         }
                                                         <Text
                                                             size="xs"
@@ -431,10 +438,10 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                         legendProps={{ verticalAlign: "bottom", height: 44 }}
                         yAxisProps={{ tickFormatter: (v: number) => v.toLocaleString() }}
                         series={[
-                            { name: "Đăng ký mới",           color: "blue.5"   },
-                            { name: "Tái đăng ký",           color: "teal.5"   },
-                            { name: "Tốt nghiệp",            color: "violet.5" },
-                            { name: "Hủy đăng ký",           color: "red.5"    },
+                            { name: "Đăng ký mới", color: "blue.5" },
+                            { name: "Tái đăng ký", color: "teal.5" },
+                            { name: "Tốt nghiệp", color: "violet.5" },
+                            { name: "Hủy đăng ký", color: "red.5" },
                             { name: "Tỷ lệ tái đăng ký (%)", color: "orange.5" },
                         ]}
                         tooltipProps={{
@@ -460,8 +467,8 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                                         {entry.value === null || entry.value === undefined
                                                             ? "—"
                                                             : entry.name?.includes("%")
-                                                            ? `${entry.value}%`
-                                                            : Number(entry.value).toLocaleString()
+                                                                ? `${entry.value}%`
+                                                                : Number(entry.value).toLocaleString()
                                                         }
                                                     </Text>
                                                 </Group>
@@ -485,23 +492,25 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function ReportClient({ initialData, initialRetentionRows, initialPeriods, initialAreas, initialBusinesses, initialSchoolLevels }: { initialData?: SheetRow[], initialRetentionRows?: SheetRow[], initialPeriods?: string[], initialAreas?: string[], initialBusinesses?: string[], initialSchoolLevels?: string[] }) {
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>("Trường");
-    const [isScrolled, setIsScrolled]               = useState(false);
-    const [search, setSearch]                       = useState("");
-    const [statusFilter, setStatusFilter]           = useState<RetentionStatus | null>(null);
-    const [vietnamTime, setVietnamTime]             = useState("");
-    const [page, setPage]                           = useState(1);
-    const [pageSize, setPageSize]                   = useState("10");
-    const [selectedSchool, setSelectedSchool]       = useState<School | null>(null);
-    const [modalOpened, setModalOpened]             = useState(false);
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState<RetentionStatus | null>(null);
+    const [vietnamTime, setVietnamTime] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState("10");
+    const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+    const [modalOpened, setModalOpened] = useState(false);
 
     const isMobile = useMediaQuery("(max-width: 768px)");
 
     const periods = (initialPeriods && initialPeriods.length) ? initialPeriods : DEFAULT_PERIODS;
+    // Chỉ dùng cho bảng danh sách trường — không hiển thị cột "Tất cả"
+    const tablePeriods = periods.filter(p => p !== "Tất cả" && p.toLowerCase() !== "all");
     const schools = useMemo(
         () => normalizeSchools(initialData ?? [], initialRetentionRows ?? [], periods),
         [initialData, initialRetentionRows, periods],
     );
-    
+
 
     // Build select option lists and ensure values are unique (Mantine Select rejects duplicates)
     const uniq = (arr: (string | undefined)[]) => Array.from(new Set((arr || []).filter(Boolean).map(s => String(s).trim())));
@@ -580,8 +589,8 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
             const matchQuick = !activeQuickFilter || activeQuickFilter === "Trường"
                 ? true
                 : activeQuickFilter === "Học sinh"
-                ? currentStudents > 0
-                : true;
+                    ? currentStudents > 0
+                    : true;
 
             return matchSearch && matchStatus && matchArea && matchBusiness && matchLevel && matchQuick;
         });
@@ -593,30 +602,36 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
     }, [filteredSchools, page, pageSize]);
 
     // Derive dashboard aggregations from the currently filtered schools
+    const isAllPeriods = currentPeriod === "Tất cả";
     const derivedOverviewStats = useMemo(() => {
+        if (isAllPeriods) {
+            // Tất cả: tổng hợp thực sự qua các kỳ (mỗi trường đếm một lần theo kỳ mới nhất có dữ liệu)
+            const agg = aggregateSchoolsAllPeriods(filteredSchools, tablePeriods);
+            return buildOverviewStats(filteredSchools, "Tất cả", undefined, agg);
+        }
         const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
         const previousOverviewPeriod = periods[periods.indexOf(overviewPeriod) - 1];
         return buildOverviewStats(filteredSchools, overviewPeriod, previousOverviewPeriod);
-    }, [filteredSchools, currentPeriod, periods]);
+    }, [filteredSchools, currentPeriod, periods, tablePeriods, isAllPeriods]);
 
     const retentionByPeriodFiltered = useMemo(() => {
-        return periods.map(period => aggregateSchoolsByPeriod(filteredSchools, period));
-    }, [filteredSchools, periods]);
+        return tablePeriods.map(period => aggregateSchoolsByPeriod(filteredSchools, period));
+    }, [filteredSchools, tablePeriods]);
 
     const retentionByAreaFiltered = useMemo(() => {
-        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
-        return aggregateSchoolsByGroup(filteredSchools, overviewPeriod, "area", "area");
-    }, [filteredSchools, currentPeriod, periods]);
+        if (isAllPeriods) return aggregateSchoolsByGroup(filteredSchools, tablePeriods[tablePeriods.length - 1], "area", "area");
+        return aggregateSchoolsByGroup(filteredSchools, currentPeriod, "area", "area");
+    }, [filteredSchools, currentPeriod, tablePeriods, isAllPeriods]);
 
     const retentionByBusinessFiltered = useMemo(() => {
-        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
-        return aggregateSchoolsByGroup(filteredSchools, overviewPeriod, "businessName", "business");
-    }, [filteredSchools, currentPeriod, periods]);
+        if (isAllPeriods) return aggregateSchoolsByGroup(filteredSchools, tablePeriods[tablePeriods.length - 1], "businessName", "business");
+        return aggregateSchoolsByGroup(filteredSchools, currentPeriod, "businessName", "business");
+    }, [filteredSchools, currentPeriod, tablePeriods, isAllPeriods]);
 
     const retentionBySchoolLevelFiltered = useMemo(() => {
-        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
-        return aggregateSchoolsByGroup(filteredSchools, overviewPeriod, "schoolLevel", "schoolLevel");
-    }, [filteredSchools, currentPeriod, periods]);
+        if (isAllPeriods) return aggregateSchoolsByGroup(filteredSchools, tablePeriods[tablePeriods.length - 1], "schoolLevel", "schoolLevel");
+        return aggregateSchoolsByGroup(filteredSchools, currentPeriod, "schoolLevel", "schoolLevel");
+    }, [filteredSchools, currentPeriod, tablePeriods, isAllPeriods]);
 
     return (
         <>
@@ -677,9 +692,9 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                             <SegmentedControl data={periods} value={currentPeriod} onChange={setCurrentPeriod} size="sm" radius="md" />
                         </Group>
                         <Group gap="sm" wrap="nowrap">
-                            <Select placeholder="Khu vực"   data={areaOptions}    value={areaFilter}    onChange={(v) => setAreaFilter(v ?? "Tất cả")}    leftSection={<IconMapPin   size={16} />} />
+                            <Select placeholder="Khu vực" data={areaOptions} value={areaFilter} onChange={(v) => setAreaFilter(v ?? "Tất cả")} leftSection={<IconMapPin size={16} />} />
                             <Select placeholder="Kinh doanh" data={businessOptions} value={businessFilter} onChange={(v) => setBusinessFilter(v ?? "Tất cả")} leftSection={<IconBriefcase size={16} />} />
-                            <Select placeholder="Cấp học"   data={schoolLevelOptions} value={schoolLevelFilter} onChange={(v) => setSchoolLevelFilter(v ?? "Tất cả")} leftSection={<IconBookmark  size={16} />} />
+                            <Select placeholder="Cấp học" data={schoolLevelOptions} value={schoolLevelFilter} onChange={(v) => setSchoolLevelFilter(v ?? "Tất cả")} leftSection={<IconBookmark size={16} />} />
                         </Group>
                     </Group>
                     <Box mt="md">
@@ -694,10 +709,10 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                         {derivedOverviewStats.map(stat => <StatCard key={stat.label} stat={stat} />)}
                     </SimpleGrid>
                     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mt="xl">
-                        <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriodFiltered}      dataKey="period"      />
-                        <RetentionBarChart title="Retention theo khu vực"   data={retentionByAreaFiltered}        dataKey="area"        />
-                        <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusinessFiltered}   dataKey="business"    />
-                        <RetentionBarChart title="Retention theo cấp học"   data={retentionBySchoolLevelFiltered} dataKey="schoolLevel" />
+                        <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriodFiltered} dataKey="period" />
+                        <RetentionBarChart title="Retention theo khu vực" data={retentionByAreaFiltered} dataKey="area" />
+                        <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusinessFiltered} dataKey="business" />
+                        <RetentionBarChart title="Retention theo cấp học" data={retentionBySchoolLevelFiltered} dataKey="schoolLevel" />
                     </SimpleGrid>
                 </Paper>
 
@@ -718,11 +733,11 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                             <Select
                                 placeholder="Trạng thái"
                                 data={[
-                                    { value: "new",         label: "Đăng ký mới"     },
-                                    { value: "renew",       label: "Gia hạn"         },
+                                    { value: "new", label: "Đăng ký mới" },
+                                    { value: "renew", label: "Gia hạn" },
                                     { value: "not_started", label: "Chưa triển khai" },
-                                    { value: "graduated",   label: "Tốt nghiệp"      },
-                                    { value: "cancelled",   label: "Hủy"             },
+                                    { value: "graduated", label: "Tốt nghiệp" },
+                                    { value: "cancelled", label: "Hủy đăng ký" },
                                 ]}
                                 value={statusFilter}
                                 onChange={val => setStatusFilter(val as RetentionStatus | null)}
@@ -743,7 +758,7 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                                 <Table.Th>Cấp học</Table.Th>
                                 <Table.Th>Khu vực</Table.Th>
                                 <Table.Th>Kinh doanh</Table.Th>
-                                {periods.map(p => (
+                                {tablePeriods.map(p => (
                                     <Table.Th key={p} ta="center">{p}</Table.Th>
                                 ))}
                                 <Table.Th />
@@ -773,9 +788,8 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                                         <Table.Td>
                                             <Badge color="orange" variant="light">{school.businessName}</Badge>
                                         </Table.Td>
-                                        {periods.map((period, pIdx) => {
-                                                    const ret      = school.periods[period];
-                                                    const prev     = pIdx > 0 ? school.periods[periods[pIdx - 1]] : undefined;
+                                        {tablePeriods.map((period) => {
+                                            const ret = school.periods[period];
                                             if (!ret) {
                                                 return (
                                                     <Table.Td key={period} ta="center">
@@ -783,24 +797,11 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                                                     </Table.Td>
                                                 );
                                             }
-                                            const pctStr = prev
-                                                ? calcRetentionPercent(ret.students, prev.students)
-                                                : null;
-                                            const pctNum = pctStr ? parseInt(pctStr) : null;
                                             return (
                                                 <Table.Td key={period} ta="center">
-                                                    <Stack gap={4} align="center">
-                                                        <Text fw={700} size="sm">{ret.students.toLocaleString()}</Text>
-                                                        {pctStr ? (
-                                                            <Badge size="xs" color={getRetentionColor(pctNum!)} variant="filled">
-                                                                {pctStr}
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge size="xs" color={STATUS_COLORS[ret.status]} variant="light">
-                                                                {STATUS_LABELS[ret.status]}
-                                                            </Badge>
-                                                        )}
-                                                    </Stack>
+                                                    <Badge size="xs" color={STATUS_COLORS[ret.status]} variant="light">
+                                                        {STATUS_LABELS[ret.status]}
+                                                    </Badge>
                                                 </Table.Td>
                                             );
                                         })}
@@ -839,7 +840,7 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                             />
                             <Group gap={6}>
                                 <Select
-                                    data={["10","20","30","50","100"]}
+                                    data={["10", "20", "30", "50", "100"]}
                                     value={pageSize}
                                     onChange={val => { setPageSize(val || "10"); setPage(1); }}
                                     w={70} size="xs"

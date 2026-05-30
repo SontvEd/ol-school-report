@@ -123,15 +123,45 @@ const QUICK_FILTERS = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function calcRetentionPercent(current: number, previous: number | undefined): string | null {
-    if (previous === undefined || previous === 0) return null;
-    return `${Math.round((current / previous) * 100)}%`;
+function calcRetentionPercent(
+    renewed: number | undefined,
+    graduated: number | undefined,
+    previousStudents: number | undefined
+): number | null {
+    if (!previousStudents || previousStudents <= 0) {
+        return null;
+    }
+
+    return Math.round(
+        (((renewed ?? 0) + (graduated ?? 0)) / previousStudents) * 100
+    );
 }
 
 function getRetentionColor(pct: number): string {
-    if (pct >= 100) return "green";
-    if (pct >= 80) return "blue";
-    if (pct >= 60) return "yellow";
+    if (pct > 90) return "green";
+    if (pct >= 70) return "blue";
+    if (pct >= 50) return "yellow";
+    return "red";
+}
+
+function calcRenewalPercent(
+    renewed: number | undefined,
+    graduated: number | undefined,
+    previousStudents: number | undefined
+): number | null {
+    if (!previousStudents || previousStudents <= 0) {
+        return null;
+    }
+
+    return Math.round(
+        (((renewed ?? 0) + (graduated ?? 0)) / previousStudents) * 100
+    );
+}
+
+function getRenewalColor(pct: number): string {
+    if (pct > 90) return "green";
+    if (pct >= 70) return "blue";
+    if (pct >= 50) return "yellow";
     return "red";
 }
 
@@ -460,7 +490,14 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
         ? school.periods[periodsWithStudents[0]].students : 0;
     const lastStudents = periodsWithStudents.length > 0
         ? school.periods[periodsWithStudents[periodsWithStudents.length - 1]].students : 0;
-    const overallPct = firstStudents > 0 ? Math.round((lastStudents / firstStudents) * 100) : 0;
+    const totalRetained = totalRenewed + totalGraduated;
+
+    const overallPct =
+        firstStudents > 0
+            ? Math.round(
+                (totalRetained / firstStudents) * 100
+            )
+            : 0;
     const overallColor = getRetentionColor(overallPct);
 
     const lineData = periods.map((period, idx) => {
@@ -468,7 +505,13 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
         const prevData = idx > 0 ? school.periods[periods[idx - 1]] : undefined;
         const retentionPct =
             data && prevData && prevData.students > 0
-                ? Math.round((data.students / prevData.students) * 100)
+                ? Math.round(
+                    (
+                        ((data.renewed ?? 0) +
+                            (data.graduated ?? 0))
+                        / prevData.students
+                    ) * 100
+                )
                 : null;
         return {
             period,
@@ -592,10 +635,19 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                 {periods.map((period, idx) => {
                                     const data = school.periods[period];
                                     const prevData = idx > 0 ? school.periods[periods[idx - 1]] : undefined;
-                                    const pctStr = data && prevData
-                                        ? calcRetentionPercent(data.students, prevData.students)
-                                        : null;
-                                    const pctNum = pctStr ? parseInt(pctStr) : null;
+                                    const pctNum =
+                                        data && prevData
+                                            ? calcRetentionPercent(
+                                                data.renewed,
+                                                data.graduated,
+                                                prevData.students
+                                            )
+                                            : null;
+
+                                    const pctStr =
+                                        pctNum !== null
+                                            ? `${pctNum}%`
+                                            : null;
                                     const delta = data && prevData
                                         ? data.students - prevData.students
                                         : null;
@@ -728,7 +780,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                         }}
                     />
                     <Text size="xs" c="dimmed" ta="center" mt={4}>
-                        * Tỷ lệ tái đăng ký (%) = học sinh kỳ hiện tại / kỳ trước × 100
+                        * Tỷ lệ tái đăng ký (%) = (học sinh tái đăng ký + học sinh tốt nghiệp) / học sinh kỳ trước × 100
                     </Text>
                 </Paper>
             </Stack>
@@ -787,6 +839,7 @@ export default function ReportClient({
     const schoolLevelOptions = ["Tất cả", ...schoolLevelList.filter(v => v !== "Tất cả")];
 
     const displayPeriods = periods.filter(p => p !== "Tất cả");
+    const tablePeriods = periods.filter(p => p !== "Tất cả");
 
     const firstPeriod = displayPeriods[0];
     const lastPeriod = displayPeriods[displayPeriods.length - 1];
@@ -943,7 +996,7 @@ export default function ReportClient({
                 school={selectedSchool}
                 opened={modalOpened}
                 onClose={() => setModalOpened(false)}
-                periods={periods}
+                periods={tablePeriods}
             />
 
             <Stack gap="lg" px="md" maw={1400} mx="auto">
@@ -1100,95 +1153,113 @@ export default function ReportClient({
                             />
                         </Group>
                     </Group>
+                    <Box style={{ overflowX: "auto" }}>
+                        <Table
+                            striped highlightOnHover withTableBorder stickyHeader
+                            horizontalSpacing="sm" verticalSpacing="sm"
+                            style={{ minWidth: 1200 }}
+                        >
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>STT</Table.Th>
+                                    <Table.Th>Trường</Table.Th>
+                                    <Table.Th>Cấp học</Table.Th>
+                                    <Table.Th>Khu vực</Table.Th>
+                                    <Table.Th>Kinh doanh</Table.Th>
+                                    {displayPeriods.map(p => (
+                                        <Table.Th key={p} ta="center">
+                                            {p}
+                                        </Table.Th>
+                                    ))}
+                                    <Table.Th />
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {paginatedSchools.map((school, index) => {
+                                    const levelColor = SCHOOL_LEVEL_COLOR[school.schoolLevel] ?? "gray";
+                                    return (
+                                        <Table.Tr key={school.id}>
+                                            <Table.Td>{(page - 1) * Number(pageSize) + index + 1}</Table.Td>
+                                            <Table.Td>
+                                                <Stack gap={2}>
+                                                    <Text fw={600} size="sm">{school.schoolName}</Text>
+                                                    <Group gap={4}>
+                                                        <Badge variant="light" color="gray" size="xs">{school.id}</Badge>
+                                                        <Text size="xs" c="dimmed">• {school.ward} - {school.province}</Text>
+                                                    </Group>
+                                                </Stack>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Badge color={levelColor} variant="light">{school.schoolLevel}</Badge>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Badge color="blue" variant="light">{school.area}</Badge>
+                                            </Table.Td>
+                                            <Table.Td>
+                                                <Badge color="orange" variant="light">{school.businessName}</Badge>
+                                            </Table.Td>
+                                            {displayPeriods.map((period, pIdx) => {
+                                                const ret = school.periods[period];
+                                                const prev =
+                                                    pIdx > 0
+                                                        ? school.periods[displayPeriods[pIdx - 1]]
+                                                        : undefined;
+                                                if (!ret) {
+                                                    return (
+                                                        <Table.Td key={period} ta="center">
+                                                            <Text size="xs" c="dimmed">—</Text>
+                                                        </Table.Td>
+                                                    );
+                                                }
+                                                const renewalPct =
+                                                    ret.status === "renew"
+                                                        ? calcRenewalPercent(
+                                                            ret.renewed,
+                                                            ret.graduated,
+                                                            prev?.students
+                                                        )
+                                                        : null;
 
-                    <Table
-                        striped highlightOnHover withTableBorder stickyHeader
-                        horizontalSpacing="sm" verticalSpacing="sm"
-                        style={{ minWidth: 1200 }}
-                    >
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>STT</Table.Th>
-                                <Table.Th>Trường</Table.Th>
-                                <Table.Th>Cấp học</Table.Th>
-                                <Table.Th>Khu vực</Table.Th>
-                                <Table.Th>Kinh doanh</Table.Th>
-                                {periods.map(p => (
-                                    <Table.Th key={p} ta="center">{p}</Table.Th>
-                                ))}
-                                <Table.Th />
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                            {paginatedSchools.map((school, index) => {
-                                const levelColor = SCHOOL_LEVEL_COLOR[school.schoolLevel] ?? "gray";
-                                return (
-                                    <Table.Tr key={school.id}>
-                                        <Table.Td>{(page - 1) * Number(pageSize) + index + 1}</Table.Td>
-                                        <Table.Td>
-                                            <Stack gap={2}>
-                                                <Text fw={600} size="sm">{school.schoolName}</Text>
-                                                <Group gap={4}>
-                                                    <Badge variant="light" color="gray" size="xs">{school.id}</Badge>
-                                                    <Text size="xs" c="dimmed">• {school.ward} - {school.province}</Text>
-                                                </Group>
-                                            </Stack>
-                                        </Table.Td>
-                                        <Table.Td>
-                                            <Badge color={levelColor} variant="light">{school.schoolLevel}</Badge>
-                                        </Table.Td>
-                                        <Table.Td>
-                                            <Badge color="blue" variant="light">{school.area}</Badge>
-                                        </Table.Td>
-                                        <Table.Td>
-                                            <Badge color="orange" variant="light">{school.businessName}</Badge>
-                                        </Table.Td>
-                                        {periods.map((period, pIdx) => {
-                                            const ret = school.periods[period];
-                                            const prev = pIdx > 0 ? school.periods[periods[pIdx - 1]] : undefined;
-                                            if (!ret) {
                                                 return (
                                                     <Table.Td key={period} ta="center">
-                                                        <Text size="xs" c="dimmed">—</Text>
+                                                        <Stack gap={3} align="center">
+                                                            <Text fw={700} size="sm">
+                                                                {ret.students.toLocaleString("vi-VN")}
+                                                            </Text>
+
+                                                            {ret.status === "renew" && renewalPct !== null ? (
+                                                                <Badge
+                                                                    size="xs"
+                                                                    color={getRenewalColor(renewalPct)}
+                                                                    variant="filled"
+                                                                >
+                                                                    {renewalPct}%
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge size="xs" color={STATUS_COLORS[ret.status]} variant="light">
+                                                                    {STATUS_LABELS[ret.status]}
+                                                                </Badge>
+                                                            )}
+                                                        </Stack>
                                                     </Table.Td>
                                                 );
-                                            }
-                                            const pctStr = prev
-                                                ? calcRetentionPercent(ret.students, prev.students)
-                                                : null;
-                                            const pctNum = pctStr ? parseInt(pctStr) : null;
-                                            return (
-                                                <Table.Td key={period} ta="center">
-                                                    <Stack gap={4} align="center">
-                                                        <Text fw={700} size="sm">{ret.students.toLocaleString('vi-VN')}</Text>
-                                                        {pctStr ? (
-                                                            <Badge size="xs" color={getRetentionColor(pctNum!)} variant="filled">
-                                                                {pctStr}
-                                                            </Badge>
-                                                        ) : (
-                                                            <Badge size="xs" color={STATUS_COLORS[ret.status]} variant="light">
-                                                                {STATUS_LABELS[ret.status]}
-                                                            </Badge>
-                                                        )}
-                                                    </Stack>
-                                                </Table.Td>
-                                            );
-                                        })}
-                                        <Table.Td>
-                                            <Tooltip label="Xem chi tiết" withArrow>
-                                                <Button
-                                                    variant="light" color="gray" size="xs"
-                                                    onClick={() => openDetail(school)}
-                                                >
-                                                    <IconEye size={16} />
-                                                </Button>
-                                            </Tooltip>
-                                        </Table.Td>
-                                    </Table.Tr>
-                                );
-                            })}
-                        </Table.Tbody>
-                    </Table>
+                                            })}
+                                            <Table.Td>
+                                                <Tooltip label="Xem chi tiết" withArrow>
+                                                    <Button
+                                                        variant="light" color="gray" size="xs"
+                                                        onClick={() => openDetail(school)}
+                                                    >
+                                                        <IconEye size={16} />
+                                                    </Button>
+                                                </Tooltip>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    );
+                                })}
+                            </Table.Tbody>
+                        </Table>
+                    </Box>
 
                     {/* Pagination */}
                     <Box

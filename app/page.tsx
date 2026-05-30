@@ -8,12 +8,22 @@ export const revalidate = 0;
 
 async function Home() {
   const data = await getSheetData("Trường");
+  const retentionRows = await getSheetData("RetentionSchools", { headerRow: 1, startRow: 2 }).catch(() => []);
   const settingsRows = await getSheetData("0. Setting", { headerRow: 1, startRow: 2 }).catch(() => []);
 
-  const periods = Array.from(new Set(settingsRows.map((r: any) => r["Giai đoạn"]).filter(Boolean)));
-  const areas = Array.from(new Set(settingsRows.map((r: any) => r["Khu vực"]).filter(Boolean)));
-  const businesses = Array.from(new Set(settingsRows.map((r: any) => r["Kinh doanh"]).filter(Boolean)));
-  const schoolLevels = Array.from(new Set(settingsRows.map((r: any) => r["Cấp học"]).filter(Boolean)));
+  const uniqueValues = (rows: Array<Record<string, unknown>>, key: string) =>
+    Array.from(
+      new Set(
+        rows
+          .map(row => row[key])
+          .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      )
+    );
+
+  const periods = uniqueValues(settingsRows as Array<Record<string, unknown>>, "Giai đoạn");
+  const areas = uniqueValues(settingsRows as Array<Record<string, unknown>>, "Khu vực");
+  const businesses = uniqueValues(settingsRows as Array<Record<string, unknown>>, "Kinh doanh");
+  const schoolLevels = uniqueValues(settingsRows as Array<Record<string, unknown>>, "Cấp học");
 
   return (
     <Suspense
@@ -32,6 +42,7 @@ async function Home() {
     >
       <ReportClient
         initialData={data}
+        initialRetentionRows={retentionRows}
         initialPeriods={periods}
         initialAreas={areas}
         initialBusinesses={businesses}

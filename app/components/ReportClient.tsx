@@ -50,43 +50,21 @@ import {
 } from "@tabler/icons-react";
 import { useMediaQuery } from "@mantine/hooks";
 import RefreshButton from "./RefreshButton";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-export type RetentionStatus =
-    | "new"
-    | "renew"
-    | "graduated"
-    | "not_started"
-    | "cancelled";
-
-export interface Period {
-    id: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    isActive?: boolean;
-}
-
-export interface SchoolPeriodData {
-    students: number;
-    status: RetentionStatus;
-    // Chi tiết biến động học sinh trong kỳ
-    newStudents?: number;   // Đăng ký mới
-    renewed?: number;       // Tái đăng ký / gia hạn
-    graduated?: number;     // Tốt nghiệp
-    cancelled?: number;     // Hủy đăng ký
-}
-
-export interface School {
-    id: string;
-    schoolName: string;
-    area: string;
-    province: string;
-    ward: string;
-    schoolLevel: string;
-    businessName: string;
-    periods: Record<string, SchoolPeriodData>;
-}
+import QuickFilterTabs from "./report/QuickFilterTabs";
+import {
+    DEFAULT_PERIODS,
+    SCHOOL_LEVEL_COLOR,
+    STATUS_COLORS,
+    STATUS_LABELS,
+    calcRetentionPercent,
+    getRetentionColor,
+    normalizeSchools,
+    aggregateSchoolsByPeriod,
+    aggregateSchoolsByGroup,
+    type RetentionStatus,
+    type School,
+    type SheetRow,
+} from "@/lib/report-data";
 
 interface StatItem {
     label: string;
@@ -97,178 +75,28 @@ interface StatItem {
     trendType: "up" | "down" | "neutral";
     accentColor: string;
 }
+function buildOverviewStats(schools: School[], period: string, previousPeriod?: string): StatItem[] {
+    const current = aggregateSchoolsByPeriod(schools, period);
+    const previous = previousPeriod ? aggregateSchoolsByPeriod(schools, previousPeriod) : null;
+    const total = Math.max(schools.length, 1);
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-export const DEFAULT_PERIODS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
+    const trendFor = (currentValue: number, previousValue: number | null) => {
+        if (previousValue === null) return { trend: null, trendType: "neutral" as const };
+        const delta = currentValue - previousValue;
+        if (delta > 0) return { trend: `+${delta}`, trendType: "up" as const };
+        if (delta < 0) return { trend: `${delta}`, trendType: "down" as const };
+        return { trend: null, trendType: "neutral" as const };
+    };
 
-export const STATUS_LABELS: Record<RetentionStatus, string> = {
-    new: "Mới",
-    renew: "Gia hạn",
-    graduated: "Tốt nghiệp",
-    not_started: "Chưa triển khai",
-    cancelled: "Hủy",
-};
+    const percent = (value: number) => `${Math.round((value / total) * 100)}%`;
 
-export const STATUS_COLORS: Record<RetentionStatus, string> = {
-    new: "green",
-    renew: "blue",
-    graduated: "violet",
-    not_started: "yellow",
-    cancelled: "red",
-};
-
-export const SCHOOL_LEVEL_COLOR: Record<string, string> = {
-    THPT: "blue",
-    THCS: "yellow",
-    "Tiểu học": "green",
-    "Liên cấp": "violet",
-};
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-export const SCHOOLS: School[] = [
-    {
-        id: "S-00001",
-        schoolName: "THPT Chuyên Hà Nội",
-        area: "KV1",
-        province: "Hà Nội",
-        ward: "Thanh Xuân",
-        schoolLevel: "THPT",
-        businessName: "KD1",
-        periods: {
-            "2023-2024": { students: 1200, status: "renew",  newStudents: 200, renewed: 950, graduated: 30, cancelled: 20 },
-            "2024-2025": { students: 1350, status: "renew",  newStudents: 220, renewed: 1080, graduated: 35, cancelled: 15 },
-            "2025-2026": { students: 1500, status: "renew",  newStudents: 250, renewed: 1200, graduated: 40, cancelled: 10 },
-            "2026-2027": { students: 1600, status: "renew",  newStudents: 180, renewed: 1380, graduated: 25, cancelled: 5  },
-        },
-    },
-    {
-        id: "S-00002",
-        schoolName: "THCS Đống Đa",
-        area: "KV1",
-        province: "Hà Nội",
-        ward: "Đống Đa",
-        schoolLevel: "THCS",
-        businessName: "KD1",
-        periods: {
-            "2023-2024": { students: 700,  status: "new",   newStudents: 700, renewed: 0,   graduated: 0,  cancelled: 0  },
-            "2024-2025": { students: 850,  status: "renew", newStudents: 180, renewed: 650, graduated: 20, cancelled: 30 },
-            "2025-2026": { students: 920,  status: "renew", newStudents: 120, renewed: 810, graduated: 25, cancelled: 15 },
-            "2026-2027": { students: 950,  status: "renew", newStudents: 90,  renewed: 870, graduated: 30, cancelled: 10 },
-        },
-    },
-    {
-        id: "S-00003",
-        schoolName: "Tiểu học Việt Úc",
-        area: "KV2",
-        province: "Đà Nẵng",
-        ward: "Hải Châu",
-        schoolLevel: "Tiểu học",
-        businessName: "KD2",
-        periods: {
-            "2023-2024": { students: 0,   status: "not_started", newStudents: 0,   renewed: 0,   graduated: 0,  cancelled: 0 },
-            "2024-2025": { students: 650, status: "new",         newStudents: 650, renewed: 0,   graduated: 0,  cancelled: 0 },
-            "2025-2026": { students: 0,   status: "not_started", newStudents: 0,   renewed: 0,   graduated: 0,  cancelled: 0 },
-            "2026-2027": { students: 720, status: "renew",       newStudents: 100, renewed: 580, graduated: 40, cancelled: 10 },
-        },
-    },
-    {
-        id: "S-00004",
-        schoolName: "Liên cấp Nguyễn Huệ",
-        area: "KV3",
-        province: "TP.HCM",
-        ward: "Bình Thạnh",
-        schoolLevel: "Liên cấp",
-        businessName: "KD3",
-        periods: {
-            "2023-2024": { students: 2000, status: "renew",     newStudents: 300, renewed: 1600, graduated: 60, cancelled: 40 },
-            "2024-2025": { students: 2200, status: "renew",     newStudents: 350, renewed: 1780, graduated: 80, cancelled: 90 },
-            "2025-2026": { students: 1800, status: "graduated", newStudents: 100, renewed: 1400, graduated: 400, cancelled: 100 },
-            "2026-2027": { students: 0,    status: "cancelled", newStudents: 0,   renewed: 0,   graduated: 0,  cancelled: 1800 },
-        },
-    },
-    {
-        id: "S-00005",
-        schoolName: "THPT Lê Quý Đôn",
-        area: "KV4",
-        province: "Cần Thơ",
-        ward: "Ninh Kiều",
-        schoolLevel: "THPT",
-        businessName: "KD4",
-        periods: {
-            "2023-2024": { students: 0,    status: "cancelled", newStudents: 0,   renewed: 0,   graduated: 0,  cancelled: 0   },
-            "2024-2025": { students: 900,  status: "new",       newStudents: 900, renewed: 0,   graduated: 0,  cancelled: 0   },
-            "2025-2026": { students: 1050, status: "renew",     newStudents: 200, renewed: 820, graduated: 30, cancelled: 50  },
-            "2026-2027": { students: 1120, status: "renew",     newStudents: 150, renewed: 950, graduated: 40, cancelled: 40  },
-        },
-    },
-    {
-        id: "S-00006",
-        schoolName: "THCS Trần Phú",
-        area: "KV2",
-        province: "Huế",
-        ward: "Phú Xuân",
-        schoolLevel: "THCS",
-        businessName: "KD2",
-        periods: {
-            "2023-2024": { students: 500, status: "new",   newStudents: 500, renewed: 0,   graduated: 0,  cancelled: 0  },
-            "2024-2025": { students: 650, status: "renew", newStudents: 100, renewed: 520, graduated: 20, cancelled: 30 },
-            "2025-2026": { students: 780, status: "renew", newStudents: 120, renewed: 630, graduated: 25, cancelled: 15 },
-            "2026-2027": { students: 820, status: "renew", newStudents: 80,  renewed: 750, graduated: 30, cancelled: 10 },
-        },
-    },
-];
-
-export const retentionByPeriod = [
-    { period: "2023-2024", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
-    { period: "2024-2025", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
-    { period: "2025-2026", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-];
-
-const retentionByArea = [
-    { area: "KV1", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
-    { area: "KV2", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
-    { area: "KV3", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-    { area: "KV4", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-];
-
-const retentionByBusiness = [
-    { business: "KD1", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
-    { business: "KD2", giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
-    { business: "KD3", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-    { business: "KD4", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-];
-
-const retentionBySchoolLevel = [
-    { schoolLevel: "Tiểu học", giaHan: 88, totNghiep: 62, chuaTrienKhai: 38, huy: 22, tong: 123, moi: 10 },
-    { schoolLevel: "THCS",     giaHan: 91, totNghiep: 68, chuaTrienKhai: 32, huy: 18, tong: 123, moi: 10 },
-    { schoolLevel: "THPT",     giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-    { schoolLevel: "Liên cấp", giaHan: 94, totNghiep: 75, chuaTrienKhai: 25, huy: 14, tong: 123, moi: 10 },
-];
-
-const STATS: StatItem[] = [
-    { label: "Tổng trường",       value: 234, icon: IconBuildings,        percent: null,   trend: "+3",  trendType: "up",      accentColor: "blue"   },
-    { label: "Đăng ký mới",       value: 12,  icon: IconBuildingPlus,     percent: "5%",   trend: "+2%", trendType: "up",      accentColor: "green"  },
-    { label: "Gia hạn",           value: 14,  icon: IconBuildingCommunity,percent: "6.0%", trend: "-1%", trendType: "down",    accentColor: "violet" },
-    { label: "Chưa triển khai",   value: 9,   icon: IconHomeHand,         percent: "3.8%", trend: null,  trendType: "neutral", accentColor: "yellow" },
-    { label: "Hủy đăng ký",       value: 4,   icon: IconBuildingMinus,    percent: "1.7%", trend: null,  trendType: "neutral", accentColor: "red"    },
-];
-
-const QUICK_FILTERS = [
-    { label: "Trường",   count: 234, color: "blue",  icon: IconBuildings },
-    { label: "Học sinh", count: 120, color: "green", icon: IconSchool    },
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function calcRetentionPercent(current: number, previous: number | undefined): string | null {
-    if (previous === undefined || previous === 0) return null;
-    return `${Math.round((current / previous) * 100)}%`;
-}
-
-function getRetentionColor(pct: number): string {
-    if (pct >= 100) return "green";
-    if (pct >= 80)  return "blue";
-    if (pct >= 60)  return "yellow";
-    return "red";
+    return [
+        { label: "Tổng trường", value: total, icon: IconBuildings, percent: null, ...trendFor(total, previous ? previous.tong : null), accentColor: "blue" },
+        { label: "Đăng ký mới", value: current.moi, icon: IconBuildingPlus, percent: percent(current.moi), ...trendFor(current.moi, previous ? previous.moi : null), accentColor: "green" },
+        { label: "Gia hạn", value: current.giaHan, icon: IconBuildingCommunity, percent: percent(current.giaHan), ...trendFor(current.giaHan, previous ? previous.giaHan : null), accentColor: "violet" },
+        { label: "Chưa triển khai", value: current.chuaTrienKhai, icon: IconHomeHand, percent: percent(current.chuaTrienKhai), ...trendFor(current.chuaTrienKhai, previous ? previous.chuaTrienKhai : null), accentColor: "yellow" },
+        { label: "Hủy đăng ký", value: current.huy, icon: IconBuildingMinus, percent: percent(current.huy), ...trendFor(current.huy, previous ? previous.huy : null), accentColor: "red" },
+    ];
 }
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
@@ -320,7 +148,7 @@ function StatCard({ stat }: { stat: StatItem }) {
 // ─── RetentionBarChart ────────────────────────────────────────────────────────
 function RetentionBarChart({ title, data, dataKey }: {
     title: string;
-    data: any[];
+    data: Array<Record<string, string | number>>;
     dataKey: string;
 }) {
     return (
@@ -610,25 +438,28 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                             { name: "Tỷ lệ tái đăng ký (%)", color: "orange.5" },
                         ]}
                         tooltipProps={{
-                            content: ({ payload, label }: any) => {
+                            content: (props) => {
+                                const payload = props.payload as ReadonlyArray<{ name?: string; color?: string; value?: number | string | null }> | undefined;
+                                const label = props.label;
                                 if (!payload?.length) return null;
                                 return (
                                     <Paper p="xs" withBorder shadow="sm" radius="sm" style={{ minWidth: 200 }}>
                                         <Text size="xs" fw={700} mb={6}>{label}</Text>
                                         <Stack gap={4}>
-                                            {payload.map((entry: any) => (
-                                                <Group key={entry.name} gap={6} justify="space-between">
+                                            {payload.map((entry) => (
+                                                <Group key={entry.name ?? "value"} gap={6} justify="space-between">
                                                     <Group gap={4}>
                                                         <Box
-                                                            w={8} h={8}
+                                                            w={8}
+                                                            h={8}
                                                             style={{ borderRadius: 2, background: entry.color, flexShrink: 0 }}
                                                         />
-                                                        <Text size="xs" c="dimmed">{entry.name}</Text>
+                                                        <Text size="xs" c="dimmed">{entry.name ?? ""}</Text>
                                                     </Group>
                                                     <Text size="xs" fw={600}>
                                                         {entry.value === null || entry.value === undefined
                                                             ? "—"
-                                                            : entry.name.includes("%")
+                                                            : entry.name?.includes("%")
                                                             ? `${entry.value}%`
                                                             : Number(entry.value).toLocaleString()
                                                         }
@@ -652,7 +483,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function ReportClient({ initialData, initialPeriods, initialAreas, initialBusinesses, initialSchoolLevels }: { initialData?: any, initialPeriods?: string[], initialAreas?: string[], initialBusinesses?: string[], initialSchoolLevels?: string[] }) {
+export default function ReportClient({ initialData, initialRetentionRows, initialPeriods, initialAreas, initialBusinesses, initialSchoolLevels }: { initialData?: SheetRow[], initialRetentionRows?: SheetRow[], initialPeriods?: string[], initialAreas?: string[], initialBusinesses?: string[], initialSchoolLevels?: string[] }) {
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>("Trường");
     const [isScrolled, setIsScrolled]               = useState(false);
     const [search, setSearch]                       = useState("");
@@ -666,6 +497,32 @@ export default function ReportClient({ initialData, initialPeriods, initialAreas
     const isMobile = useMediaQuery("(max-width: 768px)");
 
     const periods = (initialPeriods && initialPeriods.length) ? initialPeriods : DEFAULT_PERIODS;
+    const schools = useMemo(
+        () => normalizeSchools(initialData ?? [], initialRetentionRows ?? [], periods),
+        [initialData, initialRetentionRows, periods],
+    );
+    const overviewPeriod = periods[periods.length - 1] ?? DEFAULT_PERIODS[DEFAULT_PERIODS.length - 1];
+    const previousOverviewPeriod = periods[periods.length - 2];
+    const overviewStats = useMemo(
+        () => buildOverviewStats(schools, overviewPeriod, previousOverviewPeriod),
+        [schools, overviewPeriod, previousOverviewPeriod],
+    );
+    const retentionByPeriod = useMemo(
+        () => periods.map(period => aggregateSchoolsByPeriod(schools, period)),
+        [schools, periods],
+    );
+    const retentionByArea = useMemo(
+        () => aggregateSchoolsByGroup(schools, overviewPeriod, "area", "area"),
+        [schools, overviewPeriod],
+    );
+    const retentionByBusiness = useMemo(
+        () => aggregateSchoolsByGroup(schools, overviewPeriod, "businessName", "business"),
+        [schools, overviewPeriod],
+    );
+    const retentionBySchoolLevel = useMemo(
+        () => aggregateSchoolsByGroup(schools, overviewPeriod, "schoolLevel", "schoolLevel"),
+        [schools, overviewPeriod],
+    );
 
     // Build select option lists and ensure values are unique (Mantine Select rejects duplicates)
     const uniq = (arr: (string | undefined)[]) => Array.from(new Set((arr || []).filter(Boolean).map(s => String(s).trim())));
@@ -706,18 +563,31 @@ export default function ReportClient({ initialData, initialPeriods, initialAreas
     }, []);
 
     // Filter
+    const quickFilterItems = useMemo(() => [
+        { label: "Trường", count: schools.length, color: "blue", icon: IconBuildings },
+        {
+            label: "Học sinh",
+            count: schools.reduce((total, school) => total + Object.values(school.periods).reduce((periodTotal, period) => periodTotal + period.students, 0), 0),
+            color: "green",
+            icon: IconSchool,
+        },
+    ], [schools]);
+
     const filteredSchools = useMemo(() => {
         const kw = search.toLowerCase().trim();
-        return SCHOOLS.filter(s => {
+        return schools.filter(s => {
             const matchSearch =
                 s.schoolName.toLowerCase().includes(kw) ||
-                s.id.toLowerCase().includes(kw);
+                s.id.toLowerCase().includes(kw) ||
+                s.area.toLowerCase().includes(kw) ||
+                s.province.toLowerCase().includes(kw) ||
+                s.ward.toLowerCase().includes(kw);
             const matchStatus =
                 !statusFilter ||
                 Object.values(s.periods).some(p => p.status === statusFilter);
             return matchSearch && matchStatus;
         });
-    }, [search, statusFilter]);
+    }, [schools, search, statusFilter]);
 
     const paginatedSchools = useMemo(() => {
         const start = (page - 1) * Number(pageSize);
@@ -788,35 +658,16 @@ export default function ReportClient({ initialData, initialPeriods, initialAreas
                             <Select placeholder="Cấp học"   data={schoolLevelOptions} defaultValue={schoolLevelOptions[0]} leftSection={<IconBookmark  size={16} />} />
                         </Group>
                     </Group>
-                    <Group gap="sm" mt="md">
-                        {QUICK_FILTERS.map(({ label, count, color, icon: Icon }) => (
-                            <Pill
-                                key={label}
-                                size="sm"
-                                onClick={() => setActiveQuickFilter(activeQuickFilter === label ? null : label)}
-                                style={{
-                                    cursor: "pointer",
-                                    border: `1.5px solid var(--mantine-color-${color}-${activeQuickFilter === label ? "9" : "3"})`,
-                                    background: activeQuickFilter === label
-                                        ? `var(--mantine-color-${color}-light)`
-                                        : `var(--mantine-color-${color}-0)`,
-                                    color: `var(--mantine-color-${color}-${activeQuickFilter === label ? "9" : "6"})`,
-                                }}
-                            >
-                                <Group gap={6} wrap="nowrap">
-                                    <Icon size={18} />
-                                    <Text>{label} ({count})</Text>
-                                </Group>
-                            </Pill>
-                        ))}
-                    </Group>
+                    <Box mt="md">
+                        <QuickFilterTabs items={quickFilterItems} active={activeQuickFilter} onChange={setActiveQuickFilter} />
+                    </Box>
                 </Paper>
 
                 {/* ── Tổng quan ── */}
                 <Paper withBorder p="md" radius="md" shadow="xs">
                     <Text fw={700} size="md" tt="uppercase" c="dimmed" mb="md">TỔNG QUAN</Text>
                     <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
-                        {STATS.map(stat => <StatCard key={stat.label} stat={stat} />)}
+                        {overviewStats.map(stat => <StatCard key={stat.label} stat={stat} />)}
                     </SimpleGrid>
                     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mt="xl">
                         <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriod}      dataKey="period"      />

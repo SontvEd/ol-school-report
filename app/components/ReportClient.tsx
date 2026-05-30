@@ -501,28 +501,7 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
         () => normalizeSchools(initialData ?? [], initialRetentionRows ?? [], periods),
         [initialData, initialRetentionRows, periods],
     );
-    const overviewPeriod = periods[periods.length - 1] ?? DEFAULT_PERIODS[DEFAULT_PERIODS.length - 1];
-    const previousOverviewPeriod = periods[periods.length - 2];
-    const overviewStats = useMemo(
-        () => buildOverviewStats(schools, overviewPeriod, previousOverviewPeriod),
-        [schools, overviewPeriod, previousOverviewPeriod],
-    );
-    const retentionByPeriod = useMemo(
-        () => periods.map(period => aggregateSchoolsByPeriod(schools, period)),
-        [schools, periods],
-    );
-    const retentionByArea = useMemo(
-        () => aggregateSchoolsByGroup(schools, overviewPeriod, "area", "area"),
-        [schools, overviewPeriod],
-    );
-    const retentionByBusiness = useMemo(
-        () => aggregateSchoolsByGroup(schools, overviewPeriod, "businessName", "business"),
-        [schools, overviewPeriod],
-    );
-    const retentionBySchoolLevel = useMemo(
-        () => aggregateSchoolsByGroup(schools, overviewPeriod, "schoolLevel", "schoolLevel"),
-        [schools, overviewPeriod],
-    );
+    
 
     // Build select option lists and ensure values are unique (Mantine Select rejects duplicates)
     const uniq = (arr: (string | undefined)[]) => Array.from(new Set((arr || []).filter(Boolean).map(s => String(s).trim())));
@@ -534,10 +513,16 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
     const businessOptions = ["Tất cả", ...businessList.filter(v => v !== "Tất cả")];
     const schoolLevelOptions = ["Tất cả", ...schoolLevelList.filter(v => v !== "Tất cả")];
 
+    const [areaFilter, setAreaFilter] = useState<string>(areaOptions[0] ?? "Tất cả");
+    const [businessFilter, setBusinessFilter] = useState<string>(businessOptions[0] ?? "Tất cả");
+    const [schoolLevelFilter, setSchoolLevelFilter] = useState<string>(schoolLevelOptions[0] ?? "Tất cả");
+
     const openDetail = (school: School) => {
         setSelectedSchool(school);
         setModalOpened(true);
     };
+
+    const [currentPeriod, setCurrentPeriod] = useState<string>(periods[0]);
 
     // Vietnam time ticker
     useEffect(() => {
@@ -582,17 +567,56 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                 s.area.toLowerCase().includes(kw) ||
                 s.province.toLowerCase().includes(kw) ||
                 s.ward.toLowerCase().includes(kw);
+
             const matchStatus =
                 !statusFilter ||
                 Object.values(s.periods).some(p => p.status === statusFilter);
-            return matchSearch && matchStatus;
+
+            const matchArea = !areaFilter || areaFilter === "Tất cả" || s.area === areaFilter;
+            const matchBusiness = !businessFilter || businessFilter === "Tất cả" || s.businessName === businessFilter;
+            const matchLevel = !schoolLevelFilter || schoolLevelFilter === "Tất cả" || s.schoolLevel === schoolLevelFilter;
+
+            const currentStudents = s.periods[currentPeriod]?.students ?? 0;
+            const matchQuick = !activeQuickFilter || activeQuickFilter === "Trường"
+                ? true
+                : activeQuickFilter === "Học sinh"
+                ? currentStudents > 0
+                : true;
+
+            return matchSearch && matchStatus && matchArea && matchBusiness && matchLevel && matchQuick;
         });
-    }, [schools, search, statusFilter]);
+    }, [schools, search, statusFilter, areaFilter, businessFilter, schoolLevelFilter, activeQuickFilter, currentPeriod]);
 
     const paginatedSchools = useMemo(() => {
         const start = (page - 1) * Number(pageSize);
         return filteredSchools.slice(start, start + Number(pageSize));
     }, [filteredSchools, page, pageSize]);
+
+    // Derive dashboard aggregations from the currently filtered schools
+    const derivedOverviewStats = useMemo(() => {
+        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
+        const previousOverviewPeriod = periods[periods.indexOf(overviewPeriod) - 1];
+        return buildOverviewStats(filteredSchools, overviewPeriod, previousOverviewPeriod);
+    }, [filteredSchools, currentPeriod, periods]);
+
+    const retentionByPeriodFiltered = useMemo(() => {
+        return periods.map(period => aggregateSchoolsByPeriod(filteredSchools, period));
+    }, [filteredSchools, periods]);
+
+    const retentionByAreaFiltered = useMemo(() => {
+        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
+        return aggregateSchoolsByGroup(filteredSchools, overviewPeriod, "area", "area");
+    }, [filteredSchools, currentPeriod, periods]);
+
+    const retentionByBusinessFiltered = useMemo(() => {
+        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
+        return aggregateSchoolsByGroup(filteredSchools, overviewPeriod, "businessName", "business");
+    }, [filteredSchools, currentPeriod, periods]);
+
+    const retentionBySchoolLevelFiltered = useMemo(() => {
+        const overviewPeriod = currentPeriod ?? periods[periods.length - 1];
+        return aggregateSchoolsByGroup(filteredSchools, overviewPeriod, "schoolLevel", "schoolLevel");
+    }, [filteredSchools, currentPeriod, periods]);
 
     return (
         <>
@@ -650,12 +674,12 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                                 <IconCalendar size={20} />
                                 <Text fw={500} tt="uppercase" size="md">Giai đoạn</Text>
                             </Group>
-                            <SegmentedControl data={periods} defaultValue={periods[0]} size="sm" radius="md" />
+                            <SegmentedControl data={periods} value={currentPeriod} onChange={setCurrentPeriod} size="sm" radius="md" />
                         </Group>
                         <Group gap="sm" wrap="nowrap">
-                            <Select placeholder="Khu vực"   data={areaOptions}    defaultValue={areaOptions[0]}    leftSection={<IconMapPin   size={16} />} />
-                            <Select placeholder="Kinh doanh" data={businessOptions} defaultValue={businessOptions[0]} leftSection={<IconBriefcase size={16} />} />
-                            <Select placeholder="Cấp học"   data={schoolLevelOptions} defaultValue={schoolLevelOptions[0]} leftSection={<IconBookmark  size={16} />} />
+                            <Select placeholder="Khu vực"   data={areaOptions}    value={areaFilter}    onChange={(v) => setAreaFilter(v ?? "Tất cả")}    leftSection={<IconMapPin   size={16} />} />
+                            <Select placeholder="Kinh doanh" data={businessOptions} value={businessFilter} onChange={(v) => setBusinessFilter(v ?? "Tất cả")} leftSection={<IconBriefcase size={16} />} />
+                            <Select placeholder="Cấp học"   data={schoolLevelOptions} value={schoolLevelFilter} onChange={(v) => setSchoolLevelFilter(v ?? "Tất cả")} leftSection={<IconBookmark  size={16} />} />
                         </Group>
                     </Group>
                     <Box mt="md">
@@ -667,13 +691,13 @@ export default function ReportClient({ initialData, initialRetentionRows, initia
                 <Paper withBorder p="md" radius="md" shadow="xs">
                     <Text fw={700} size="md" tt="uppercase" c="dimmed" mb="md">TỔNG QUAN</Text>
                     <SimpleGrid cols={{ base: 2, sm: 3, md: 4, lg: 5 }} spacing="sm">
-                        {overviewStats.map(stat => <StatCard key={stat.label} stat={stat} />)}
+                        {derivedOverviewStats.map(stat => <StatCard key={stat.label} stat={stat} />)}
                     </SimpleGrid>
                     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mt="xl">
-                        <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriod}      dataKey="period"      />
-                        <RetentionBarChart title="Retention theo khu vực"   data={retentionByArea}        dataKey="area"        />
-                        <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusiness}   dataKey="business"    />
-                        <RetentionBarChart title="Retention theo cấp học"   data={retentionBySchoolLevel} dataKey="schoolLevel" />
+                        <RetentionBarChart title="Retention theo giai đoạn" data={retentionByPeriodFiltered}      dataKey="period"      />
+                        <RetentionBarChart title="Retention theo khu vực"   data={retentionByAreaFiltered}        dataKey="area"        />
+                        <RetentionBarChart title="Retention theo kinh doanh" data={retentionByBusinessFiltered}   dataKey="business"    />
+                        <RetentionBarChart title="Retention theo cấp học"   data={retentionBySchoolLevelFiltered} dataKey="schoolLevel" />
                     </SimpleGrid>
                 </Paper>
 

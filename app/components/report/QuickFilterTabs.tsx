@@ -17,10 +17,10 @@ interface QuickFilterTabsProps {
 export default function QuickFilterTabs({ items, active, onChange }: QuickFilterTabsProps) {
     if (!items.length) return null;
 
-    const value = active ?? items[0].label;
+    const value = active ?? null;
 
     return (
-        <Tabs value={value} onChange={onChange} variant="pills" radius="md">
+        <Tabs value={value} variant="pills" radius="md">
             <Tabs.List>
                 {items.map(item => {
                     const { label, count, color, icon: Icon } = item;
@@ -30,6 +30,7 @@ export default function QuickFilterTabs({ items, active, onChange }: QuickFilter
                             key={label}
                             value={label}
                             leftSection={<Icon size={16} />}
+                            onClick={() => onChange(isActive ? null : label)}
                             style={{
                                 cursor: "pointer",
                                 border: `1.5px solid var(--mantine-color-${color}-${isActive ? "9" : "3"})`,

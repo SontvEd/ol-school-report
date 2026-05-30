@@ -92,14 +92,14 @@ interface StatItem {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-export const DEFAULT_PERIODS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
+export const DEFAULT_PERIODS = ["Tất cả", "23-24", "24-25", "25-26"];
 
 export const STATUS_LABELS: Record<RetentionStatus, string> = {
     new: "Mới",
     renew: "Gia hạn",
     graduated: "Tốt nghiệp",
     not_started: "Chưa triển khai",
-    cancelled: "Hủy",
+    cancelled: "Hủy đăng ký",
 };
 
 export const STATUS_COLORS: Record<RetentionStatus, string> = {
@@ -1046,7 +1046,7 @@ export default function ReportClient({
                                     { value: "new", label: "Đăng ký mới" },
                                     { value: "renew", label: "Gia hạn" },
                                     { value: "not_started", label: "Chưa triển khai" },
-                                    { value: "cancelled", label: "Hủy" },
+                                    { value: "cancelled", label: "Hủy đăng ký" },
                                 ]}
                                 value={statusFilter}
                                 onChange={val => setStatusFilter(val as RetentionStatus | null)}

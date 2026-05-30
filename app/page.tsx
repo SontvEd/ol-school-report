@@ -10,12 +10,7 @@ async function Home() {
   const data = await getSheetData("Trường");
   const settingsRows = await getSheetData("0. Setting", { headerRow: 1, startRow: 2 }).catch(() => []);
 
-  const periods = Array.from(
-    new Set(
-      settingsRows
-        .map((r: any) => r["Giai đoạn"])
-        )
-  );
+  const periods = Array.from(new Set(settingsRows.map((r: any) => r["Giai đoạn"]).filter(Boolean)));
   console.log("Available periods:", periods);
   const areas = Array.from(new Set(settingsRows.map((r: any) => r["Khu vực"]).filter(Boolean)));
   const businesses = Array.from(new Set(settingsRows.map((r: any) => r["Kinh doanh"]).filter(Boolean)));

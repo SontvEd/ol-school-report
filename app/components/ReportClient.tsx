@@ -155,10 +155,12 @@ function computeStats(schools: School[], activePeriod: string, allPeriods: strin
 
     for (const school of schools) {
         if (isAllPeriod) {
-            // === XỬ LÝ "TẤT CẢ" ===
             let schoolHasAnyPeriod = false;
 
-            for (const periodKey of Object.keys(school.periods)) {
+            const periodKeys = Object.keys(school.periods).sort();
+            const lastPeriod = periodKeys.at(-1);
+
+            for (const periodKey of periodKeys) {
                 const pd = school.periods[periodKey];
                 if (!pd) continue;
 
@@ -167,8 +169,16 @@ function computeStats(schools: School[], activePeriod: string, allPeriods: strin
 
                 if (pd.status === "new") newCount++;
                 if (pd.status === "renew") renewCount++;
-                if (pd.status === "not_started") notStarted++;
                 if (pd.status === "cancelled") cancelled++;
+            }
+
+            // not_started chỉ lấy ở kỳ cuối cùng
+            if (lastPeriod) {
+                const lastPd = school.periods[lastPeriod];
+
+                if (lastPd?.status === "not_started") {
+                    notStarted++;
+                }
             }
 
             if (schoolHasAnyPeriod) {
@@ -375,7 +385,7 @@ function StatCard({ stat }: { stat: StatItem }) {
                     <Icon size={16} color={`var(--mantine-color-${stat.accentColor}-6)`} />
                     <Text size="sm" fw={500} c={`${stat.accentColor}.6`}>{stat.label}</Text>
                 </Group>
-                <Text size="xl" fw={700} c={`${stat.accentColor}.7`}>{stat.value.toLocaleString()}</Text>
+                <Text size="xl" fw={700} c={`${stat.accentColor}.7`}>{stat.value.toLocaleString('vi-VN')}</Text>
                 <Group justify="space-between" align="center">
                     {stat.percent ? (
                         <Pill size="xs" c={`${stat.accentColor}.9`} bg={`${stat.accentColor}.1`}>
@@ -528,7 +538,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                     />
                                 </Center>
                                 <Text size="xs" c="dimmed" ta="center" mt={4}>
-                                    {firstStudents.toLocaleString()} ⟶ {lastStudents.toLocaleString()} học sinh
+                                    {firstStudents.toLocaleString('vi-VN')} ⟶ {lastStudents.toLocaleString('vi-VN')} học sinh
                                 </Text>
                             </Paper>
                         </Grid.Col>
@@ -550,7 +560,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                         ]}
                                         tooltipDataSource="segment"
                                         withTooltip
-                                        chartLabel={(totalNew + totalRenewed + totalCancelled + totalGraduated).toLocaleString()}
+                                        chartLabel={(totalNew + totalRenewed + totalCancelled + totalGraduated).toLocaleString('vi-VN')}
                                     />
                                 </Center>
                             </Paper>
@@ -607,7 +617,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                         <Table.Tr key={period}>
                                             <Table.Td><Text size="sm" fw={500}>{period}</Text></Table.Td>
                                             <Table.Td ta="center">
-                                                <Text size="sm" fw={700}>{data.students.toLocaleString()}</Text>
+                                                <Text size="sm" fw={700}>{data.students.toLocaleString('vi-VN')}</Text>
                                             </Table.Td>
                                             <Table.Td ta="center">
                                                 <Badge size="xs" color={STATUS_COLORS[data.status]} variant="light">
@@ -615,16 +625,16 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                                 </Badge>
                                             </Table.Td>
                                             <Table.Td ta="center">
-                                                <Text size="xs">{data.newStudents?.toLocaleString() ?? "—"}</Text>
+                                                <Text size="xs">{data.newStudents?.toLocaleString('vi-VN') ?? "—"}</Text>
                                             </Table.Td>
                                             <Table.Td ta="center">
-                                                <Text size="xs">{data.renewed?.toLocaleString() ?? "—"}</Text>
+                                                <Text size="xs">{data.renewed?.toLocaleString('vi-VN') ?? "—"}</Text>
                                             </Table.Td>
                                             <Table.Td ta="center">
-                                                <Text size="xs">{data.graduated?.toLocaleString() ?? "—"}</Text>
+                                                <Text size="xs">{data.graduated?.toLocaleString('vi-VN') ?? "—"}</Text>
                                             </Table.Td>
                                             <Table.Td ta="center">
-                                                <Text size="xs">{data.cancelled?.toLocaleString() ?? "—"}</Text>
+                                                <Text size="xs">{data.cancelled?.toLocaleString('vi-VN') ?? "—"}</Text>
                                             </Table.Td>
                                             <Table.Td ta="center">
                                                 {pctNum !== null ? (
@@ -648,7 +658,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                                             size="xs" fw={600}
                                                             c={delta > 0 ? "green.6" : delta < 0 ? "red.6" : "dimmed"}
                                                         >
-                                                            {delta > 0 ? "+" : ""}{delta.toLocaleString()}
+                                                            {delta > 0 ? "+" : ""}{delta.toLocaleString('vi-VN')}
                                                         </Text>
                                                     </Group>
                                                 ) : (
@@ -677,7 +687,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                         withDots
                         connectNulls
                         legendProps={{ verticalAlign: "bottom", height: 44 }}
-                        yAxisProps={{ tickFormatter: (v: number) => v.toLocaleString() }}
+                        yAxisProps={{ tickFormatter: (v: number) => v.toLocaleString('vi-VN') }}
                         series={[
                             { name: "Đăng ký mới", color: "blue.5" },
                             { name: "Tái đăng ký", color: "teal.5" },
@@ -706,7 +716,7 @@ function SchoolDetailModal({ school, opened, onClose, periods }: {
                                                             ? "—"
                                                             : entry.name.includes("%")
                                                                 ? `${entry.value}%`
-                                                                : Number(entry.value).toLocaleString()
+                                                                : Number(entry.value).toLocaleString('vi-VN')
                                                         }
                                                     </Text>
                                                 </Group>
@@ -776,6 +786,16 @@ export default function ReportClient({
     const businessOptions = ["Tất cả", ...businessList.filter(v => v !== "Tất cả")];
     const schoolLevelOptions = ["Tất cả", ...schoolLevelList.filter(v => v !== "Tất cả")];
 
+    const displayPeriods = periods.filter(p => p !== "Tất cả");
+
+    const firstPeriod = displayPeriods[0];
+    const lastPeriod = displayPeriods[displayPeriods.length - 1];
+
+    const startYear = firstPeriod?.split("-")[0];
+    const endYear = lastPeriod?.split("-")[1];
+
+    const periodLabel = `Giai đoạn ${startYear}-${endYear}`;
+
     // Apply dropdown filters
     const filteredByDropdown = useMemo(() =>
         allSchools.filter(s => {
@@ -790,16 +810,40 @@ export default function ReportClient({
     // Apply search + status filter (for the table)
     const filteredSchools = useMemo(() => {
         const kw = search.toLowerCase().trim();
-        return filteredByDropdown.filter(s => {
+
+        return filteredByDropdown.filter((school) => {
             const matchSearch =
-                s.schoolName.toLowerCase().includes(kw) ||
-                s.id.toLowerCase().includes(kw);
+                school.schoolName.toLowerCase().includes(kw) ||
+                school.id.toLowerCase().includes(kw);
+
+            // lọc theo kỳ
+            const matchPeriod =
+                activePeriod === "Tất cả"
+                    ? true
+                    : !!school.periods[activePeriod];
+
+            // lọc theo trạng thái
             const matchStatus =
-                !statusFilter ||
-                Object.values(s.periods).some(p => p.status === statusFilter);
-            return matchSearch && matchStatus;
+                !statusFilter
+                    ? true
+                    : activePeriod === "Tất cả"
+                        ? Object.values(school.periods).some(
+                            p => p.status === statusFilter
+                        )
+                        : school.periods[activePeriod]?.status === statusFilter;
+
+            return (
+                matchSearch &&
+                matchPeriod &&
+                matchStatus
+            );
         });
-    }, [filteredByDropdown, search, statusFilter]);
+    }, [
+        filteredByDropdown,
+        search,
+        statusFilter,
+        activePeriod,
+    ]);
 
     const paginatedSchools = useMemo(() => {
         const start = (page - 1) * Number(pageSize);
@@ -922,7 +966,7 @@ export default function ReportClient({
                             <Stack gap={2}>
                                 <Title order={2} fw={700}>Tái đăng ký app Ôn luyện</Title>
                                 <Text size="sm" c="blue.6" fw={500}>
-                                    Giai đoạn {periods[0]} – {periods[periods.length - 1]}
+                                    {periodLabel}
                                 </Text>
                                 <Group gap={6}>
                                     <IconClockCheck size={16} color="gray" />
@@ -1003,7 +1047,9 @@ export default function ReportClient({
                             >
                                 <Group gap={6} wrap="nowrap">
                                     <Icon size={18} />
-                                    <Text>{label} ({count.toLocaleString()})</Text>
+                                    <Text>
+                                        {label} ({new Intl.NumberFormat('vi-VN').format(count)})
+                                    </Text>
                                 </Group>
                             </Pill>
                         ))}
@@ -1114,7 +1160,7 @@ export default function ReportClient({
                                             return (
                                                 <Table.Td key={period} ta="center">
                                                     <Stack gap={4} align="center">
-                                                        <Text fw={700} size="sm">{ret.students.toLocaleString()}</Text>
+                                                        <Text fw={700} size="sm">{ret.students.toLocaleString('vi-VN')}</Text>
                                                         {pctStr ? (
                                                             <Badge size="xs" color={getRetentionColor(pctNum!)} variant="filled">
                                                                 {pctStr}

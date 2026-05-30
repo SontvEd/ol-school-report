@@ -15,7 +15,7 @@ const STATUS_MAP: Record<string, RetentionStatus> = {
   "Gia hạn":          "renew",
   "Tốt nghiệp":       "graduated",
   "Chưa triển khai":  "not_started",
-  "Hủy":              "cancelled",
+  "Hủy đăng ký":      "cancelled",
 };
 
 /** Chuẩn hoá mã cấp học số → chuỗi hiển thị */

@@ -8,6 +8,21 @@ export const revalidate = 0;
 
 async function Home() {
   const data = await getSheetData("Trường");
+  const settingsRows = await getSheetData("0. Setting", { headerRow: 1, startRow: 2 }).catch(() => []);
+
+  const periods = Array.from(
+    new Set(
+      settingsRows
+        .map((r: any) => r["Giai đoạn"])
+        )
+  );
+  console.log("Available periods:", periods);
+  const areas = Array.from(new Set(settingsRows.map((r: any) => r["Khu vực"]).filter(Boolean)));
+  const businesses = Array.from(new Set(settingsRows.map((r: any) => r["Kinh doanh"]).filter(Boolean)));
+  console.log("Available areas:", areas);
+  console.log("Available businesses:", businesses);
+  const schoolLevels = Array.from(new Set(settingsRows.map((r: any) => r["Cấp học"]).filter(Boolean)));
+  console.log("Available school levels:", schoolLevels);
 
   return (
     <Suspense
@@ -24,7 +39,13 @@ async function Home() {
         </Box>
       }
     >
-      <ReportClient initialData={data} />
+      <ReportClient
+        initialData={data}
+        initialPeriods={periods}
+        initialAreas={areas}
+        initialBusinesses={businesses}
+        initialSchoolLevels={schoolLevels}
+      />
     </Suspense>
   );
 }

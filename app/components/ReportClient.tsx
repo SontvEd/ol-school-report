@@ -99,7 +99,7 @@ interface StatItem {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-export const PERIODS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
+export const DEFAULT_PERIODS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027"];
 
 export const STATUS_LABELS: Record<RetentionStatus, string> = {
     new: "Mới",
@@ -345,23 +345,24 @@ function RetentionBarChart({ title, data, dataKey }: {
 }
 
 // ─── SchoolDetailModal ────────────────────────────────────────────────────────
-function SchoolDetailModal({ school, opened, onClose }: {
+function SchoolDetailModal({ school, opened, onClose, periods }: {
     school: School | null;
     opened: boolean;
     onClose: () => void;
+    periods: string[];
 }) {
     if (!school) return null;
 
     const levelColor = SCHOOL_LEVEL_COLOR[school.schoolLevel] ?? "gray";
 
     // Tổng hợp toàn bộ giai đoạn
-    const totalNew       = PERIODS.reduce((s, p) => s + (school.periods[p]?.newStudents ?? 0), 0);
-    const totalRenewed   = PERIODS.reduce((s, p) => s + (school.periods[p]?.renewed    ?? 0), 0);
-    const totalCancelled = PERIODS.reduce((s, p) => s + (school.periods[p]?.cancelled  ?? 0), 0);
-    const totalGraduated = PERIODS.reduce((s, p) => s + (school.periods[p]?.graduated  ?? 0), 0);
+    const totalNew       = periods.reduce((s, p) => s + (school.periods[p]?.newStudents ?? 0), 0);
+    const totalRenewed   = periods.reduce((s, p) => s + (school.periods[p]?.renewed    ?? 0), 0);
+    const totalCancelled = periods.reduce((s, p) => s + (school.periods[p]?.cancelled  ?? 0), 0);
+    const totalGraduated = periods.reduce((s, p) => s + (school.periods[p]?.graduated  ?? 0), 0);
 
     // Overall retention (kỳ đầu → kỳ cuối có học sinh)
-    const periodsWithStudents = PERIODS.filter(p => (school.periods[p]?.students ?? 0) > 0);
+    const periodsWithStudents = periods.filter(p => (school.periods[p]?.students ?? 0) > 0);
     const firstStudents = periodsWithStudents.length > 0
         ? school.periods[periodsWithStudents[0]].students : 0;
     const lastStudents = periodsWithStudents.length > 0
@@ -370,9 +371,9 @@ function SchoolDetailModal({ school, opened, onClose }: {
     const overallColor = getRetentionColor(overallPct);
 
     // Build line chart data
-    const lineData = PERIODS.map((period, idx) => {
+    const lineData = periods.map((period, idx) => {
         const data     = school.periods[period];
-        const prevData = idx > 0 ? school.periods[PERIODS[idx - 1]] : undefined;
+        const prevData = idx > 0 ? school.periods[periods[idx - 1]] : undefined;
         const retentionPct =
             data && prevData && prevData.students > 0
                 ? Math.round((data.students / prevData.students) * 100)
@@ -499,9 +500,9 @@ function SchoolDetailModal({ school, opened, onClose }: {
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
-                                {PERIODS.map((period, idx) => {
+                                {periods.map((period, idx) => {
                                     const data     = school.periods[period];
-                                    const prevData = idx > 0 ? school.periods[PERIODS[idx - 1]] : undefined;
+                                    const prevData = idx > 0 ? school.periods[periods[idx - 1]] : undefined;
                                     const pctStr   = data && prevData
                                         ? calcRetentionPercent(data.students, prevData.students)
                                         : null;
@@ -651,7 +652,7 @@ function SchoolDetailModal({ school, opened, onClose }: {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function ReportClient({ initialData }: { initialData?: any }) {
+export default function ReportClient({ initialData, initialPeriods, initialAreas, initialBusinesses, initialSchoolLevels }: { initialData?: any, initialPeriods?: string[], initialAreas?: string[], initialBusinesses?: string[], initialSchoolLevels?: string[] }) {
     const [activeQuickFilter, setActiveQuickFilter] = useState<string | null>("Trường");
     const [isScrolled, setIsScrolled]               = useState(false);
     const [search, setSearch]                       = useState("");
@@ -663,6 +664,18 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
     const [modalOpened, setModalOpened]             = useState(false);
 
     const isMobile = useMediaQuery("(max-width: 768px)");
+
+    const periods = (initialPeriods && initialPeriods.length) ? initialPeriods : DEFAULT_PERIODS;
+
+    // Build select option lists and ensure values are unique (Mantine Select rejects duplicates)
+    const uniq = (arr: (string | undefined)[]) => Array.from(new Set((arr || []).filter(Boolean).map(s => String(s).trim())));
+    const areaList = uniq(initialAreas ?? []);
+    const businessList = uniq(initialBusinesses ?? []);
+    const schoolLevelList = uniq(initialSchoolLevels ?? []);
+
+    const areaOptions = ["Tất cả", ...areaList.filter(v => v !== "Tất cả")];
+    const businessOptions = ["Tất cả", ...businessList.filter(v => v !== "Tất cả")];
+    const schoolLevelOptions = ["Tất cả", ...schoolLevelList.filter(v => v !== "Tất cả")];
 
     const openDetail = (school: School) => {
         setSelectedSchool(school);
@@ -717,6 +730,7 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
                 school={selectedSchool}
                 opened={modalOpened}
                 onClose={() => setModalOpened(false)}
+                periods={periods}
             />
 
             <Stack gap="lg" px="md" maw={1400} mx="auto">
@@ -766,12 +780,12 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
                                 <IconCalendar size={20} />
                                 <Text fw={500} tt="uppercase" size="md">Giai đoạn</Text>
                             </Group>
-                            <SegmentedControl data={PERIODS} defaultValue={PERIODS[0]} size="sm" radius="md" />
+                            <SegmentedControl data={periods} defaultValue={periods[0]} size="sm" radius="md" />
                         </Group>
                         <Group gap="sm" wrap="nowrap">
-                            <Select placeholder="Khu vực"   data={["Tất cả","KV1","KV2","KV3","KV4"]}                    defaultValue="Tất cả" leftSection={<IconMapPin   size={16} />} />
-                            <Select placeholder="Kinh doanh" data={["Tất cả","KD1","KD2","KD3","KD4"]}                   defaultValue="Tất cả" leftSection={<IconBriefcase size={16} />} />
-                            <Select placeholder="Cấp học"   data={["Tất cả","Tiểu học","THCS","THPT","Liên cấp"]}        defaultValue="Tất cả" leftSection={<IconBookmark  size={16} />} />
+                            <Select placeholder="Khu vực"   data={areaOptions}    defaultValue={areaOptions[0]}    leftSection={<IconMapPin   size={16} />} />
+                            <Select placeholder="Kinh doanh" data={businessOptions} defaultValue={businessOptions[0]} leftSection={<IconBriefcase size={16} />} />
+                            <Select placeholder="Cấp học"   data={schoolLevelOptions} defaultValue={schoolLevelOptions[0]} leftSection={<IconBookmark  size={16} />} />
                         </Group>
                     </Group>
                     <Group gap="sm" mt="md">
@@ -854,7 +868,7 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
                                 <Table.Th>Cấp học</Table.Th>
                                 <Table.Th>Khu vực</Table.Th>
                                 <Table.Th>Kinh doanh</Table.Th>
-                                {PERIODS.map(p => (
+                                {periods.map(p => (
                                     <Table.Th key={p} ta="center">{p}</Table.Th>
                                 ))}
                                 <Table.Th />
@@ -884,9 +898,9 @@ export default function ReportClient({ initialData }: { initialData?: any }) {
                                         <Table.Td>
                                             <Badge color="orange" variant="light">{school.businessName}</Badge>
                                         </Table.Td>
-                                        {PERIODS.map((period, pIdx) => {
-                                            const ret      = school.periods[period];
-                                            const prev     = pIdx > 0 ? school.periods[PERIODS[pIdx - 1]] : undefined;
+                                        {periods.map((period, pIdx) => {
+                                                    const ret      = school.periods[period];
+                                                    const prev     = pIdx > 0 ? school.periods[periods[pIdx - 1]] : undefined;
                                             if (!ret) {
                                                 return (
                                                     <Table.Td key={period} ta="center">

@@ -1058,25 +1058,22 @@ export default function ReportClient({
                         </Group>
                         <Group gap="sm" wrap="nowrap">
                             <Select
-                                placeholder="Khu vực"
+                                label="Khu vực"
                                 data={areaOptions}
                                 value={areaFilter}
                                 onChange={val => setAreaFilter(val || "Tất cả")}
-                                leftSection={<IconMapPin size={16} />}
                             />
                             <Select
-                                placeholder="Kinh doanh"
+                                label="Kinh doanh"
                                 data={businessOptions}
                                 value={businessFilter}
                                 onChange={val => setBusinessFilter(val || "Tất cả")}
-                                leftSection={<IconBriefcase size={16} />}
                             />
                             <Select
-                                placeholder="Cấp học"
+                                label="Cấp học"
                                 data={schoolLevelOptions}
                                 value={schoolLevelFilter}
                                 onChange={val => setSchoolLevelFilter(val || "Tất cả")}
-                                leftSection={<IconBookmark size={16} />}
                             />
                         </Group>
                     </Group>

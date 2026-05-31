@@ -28,9 +28,7 @@ const SCHOOL_LEVEL_MAP: Record<string, string> = {
 
 /** Chuẩn hoá period "23-24" → "2023-2024" nếu cần */
 function normalizePeriod(raw: string): string {
-  // Đã là dạng đầy đủ
   if (/^\d{4}-\d{4}$/.test(raw)) return raw;
-  // Dạng rút gọn "23-24" → "2023-2024"
   const m = raw.match(/^(\d{2})-(\d{2})$/);
   if (m) return `20${m[1]}-20${m[2]}`;
   return raw;
